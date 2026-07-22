@@ -380,6 +380,19 @@ class AccountManager:
 # ===== 过滤设置管理 =====
 class FilterManager:
     """过滤设置管理器"""
+
+    SPAM_HINT_KEYWORDS = [
+        '兼职', '招聘', '代发', '推广', '引流', '广告', '合作', '代理',
+        '返佣', '日结', '稳赚', '客服', '咨询', '私聊', '私信', '联系我',
+        '飞机号', '电报', '频道', '群组', '拉群', '资源', '客源',
+        '博彩', '赌场', '上分', '下分', '接单', '投放'
+    ]
+    CONTACT_HINT_RE = re.compile(
+        r'(https?://|t\.me/|telegram\.me/|wa\.me/|whatsapp|line|vx|v信|微信|qq|\bTG\b|@\w{5,})',
+        re.IGNORECASE
+    )
+    PHONE_HINT_RE = re.compile(r'(?<!\d)\+?\d[\d\s\-]{6,}\d(?!\d)')
+    EMOJI_HINT_RE = re.compile(r'[\U0001F300-\U0001FAFF]')
     
     def __init__(self, settings_file: str):
         self.settings_file = settings_file
@@ -388,7 +401,8 @@ class FilterManager:
             'max_message_length': 500,  # 消息长度限制（字符数）
             'filter_no_username': False,
             'filter_no_avatar': False,
-            'min_account_age_days': 0
+            'min_account_age_days': 0,
+            'filter_ad_spam': True
         }
         self.load_settings()
     
@@ -444,6 +458,49 @@ class FilterManager:
             if account_age_days < min_age_days:
                 return False, f'账号年龄不足{min_age_days}天'
         
+        return True, ''
+
+    def check_message_filter(self, text: str) -> Tuple[bool, str]:
+        """检查消息内容是否像广告垃圾消息"""
+        if not self.settings.get('filter_ad_spam', True):
+            return True, ''
+
+        content = (text or '').strip()
+        if not content:
+            return False, '空消息'
+
+        normalized = content.lower()
+        matched_keywords = [kw for kw in self.SPAM_HINT_KEYWORDS if kw.lower() in normalized]
+        score = 0
+        reasons: List[str] = []
+
+        if len(matched_keywords) >= 2:
+            score += 2
+            reasons.append(f"广告词过多({', '.join(matched_keywords[:3])})")
+        elif len(matched_keywords) == 1:
+            score += 1
+            reasons.append(f"命中广告词({matched_keywords[0]})")
+
+        if self.CONTACT_HINT_RE.search(content):
+            score += 2
+            reasons.append('包含联系方式/外链')
+
+        if self.PHONE_HINT_RE.search(content):
+            score += 2
+            reasons.append('包含号码')
+
+        emoji_count = len(self.EMOJI_HINT_RE.findall(content))
+        if emoji_count >= 4:
+            score += 1
+            reasons.append(f'Emoji过多({emoji_count})')
+
+        if len(re.findall(r'[!！?？]{4,}', content)) > 0:
+            score += 1
+            reasons.append('标点堆叠')
+
+        if score >= 3:
+            return False, '疑似广告垃圾消息: ' + ' / '.join(reasons[:3])
+
         return True, ''
     
     def _estimate_account_age(self, user_id: int) -> int:
@@ -1681,6 +1738,7 @@ class Keyboards:
         min_age = settings.get('min_account_age_days', 7)
         no_username = '✅ 开启' if settings.get('filter_no_username', True) else '❌ 关闭'
         no_avatar = '✅ 开启' if settings.get('filter_no_avatar', False) else '❌ 关闭'
+        ad_spam = '✅ 开启' if settings.get('filter_ad_spam', True) else '❌ 关闭'
         
         keyboard = [
             [InlineKeyboardButton(text=f"🔢 冷却时间: {cooldown}分钟", callback_data="filter_cooldown")],
@@ -1688,6 +1746,7 @@ class Keyboards:
             [InlineKeyboardButton(text=f"📅 账号年龄: {min_age}天", callback_data="filter_min_age")],
             [InlineKeyboardButton(text=f"👤 无用户名过滤: {no_username}", callback_data="filter_no_username")],
             [InlineKeyboardButton(text=f"📝 无头像过滤: {no_avatar}", callback_data="filter_no_avatar")],
+            [InlineKeyboardButton(text=f"🚯 广告垃圾过滤: {ad_spam}", callback_data="filter_ad_spam")],
             [InlineKeyboardButton(text="🚫 黑名单管理", callback_data="menu_blacklist")],
             [InlineKeyboardButton(text="🔙 返回主菜单", callback_data="menu_main")]
         ]
@@ -2752,6 +2811,12 @@ class JTBot:
         async def toggle_no_avatar(callback: CallbackQuery):
             current = self.filter_manager.get_setting('filter_no_avatar')
             self.filter_manager.update_setting('filter_no_avatar', not current)
+            await menu_filters(callback)
+
+        @self.dp.callback_query(F.data == "filter_ad_spam")
+        async def toggle_ad_spam(callback: CallbackQuery):
+            current = self.filter_manager.get_setting('filter_ad_spam')
+            self.filter_manager.update_setting('filter_ad_spam', not current)
             await menu_filters(callback)
         
         @self.dp.callback_query(F.data == "filter_cooldown")
@@ -5429,6 +5494,13 @@ class JTBot:
             if len(text) > max_length:
                 self.stats['filtered_count'] += 1
                 logger.debug(f"消息过长({len(text)}>{max_length})，已过滤")
+                return
+
+            # 广告垃圾消息过滤
+            passed, reason = self.filter_manager.check_message_filter(text)
+            if not passed:
+                self.stats['filtered_count'] += 1
+                logger.info(f"广告过滤: {sender.id} - {reason}")
                 return
             
             # 匹配关键词
