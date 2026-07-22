@@ -71,6 +71,7 @@ class Config:
     ACCOUNTS_FILE = os.path.join(CONFIG_DIR, 'accounts.json')
     RECORDS_FILE = os.path.join(CONFIG_DIR, 'records.json')
     FILTER_SETTINGS_FILE = os.path.join(CONFIG_DIR, 'filter_settings.json')
+    BOT_SETTINGS_FILE = os.path.join(CONFIG_DIR, 'bot_settings.json')
     BLACKLIST_FILE = os.path.join(CONFIG_DIR, 'blacklist.json')
     PROXY_FILE = os.path.join(BASE_DIR, 'proxy.txt')
     SESSIONS_DIR = os.path.join(BASE_DIR, 'sessions')
@@ -97,9 +98,6 @@ class Config:
             errors.append('BOT_TOKEN 未配置')
         if not cls.ADMIN_USER_ID or cls.ADMIN_USER_ID == 0:
             errors.append('ADMIN_USER_ID 未配置')
-        if not cls.MONITOR_CHAT_ID or cls.MONITOR_CHAT_ID == 0:
-            errors.append('MONITOR_CHAT_ID 未配置')
-        
         if errors:
             raise ValueError('配置错误:\n' + '\n'.join(errors))
         return True
@@ -461,6 +459,50 @@ class FilterManager:
             return 180  # 半年以上
         else:
             return 30  # 较新账号
+
+
+class BotSettingsManager:
+    """Bot 全局设置管理器"""
+
+    def __init__(self, settings_file: str):
+        self.settings_file = settings_file
+        self.settings = {
+            'monitor_chat_id': Config.MONITOR_CHAT_ID
+        }
+        self.load_settings()
+
+    def load_settings(self):
+        """加载设置"""
+        try:
+            if os.path.exists(self.settings_file):
+                with open(self.settings_file, 'r', encoding='utf-8') as f:
+                    self.settings.update(json.load(f))
+                logger.info('加载 Bot 设置成功')
+            else:
+                self.save_settings()
+        except Exception as e:
+            logger.error(f'加载 Bot 设置失败: {e}')
+
+    def save_settings(self):
+        """保存设置"""
+        try:
+            with open(self.settings_file, 'w', encoding='utf-8') as f:
+                json.dump(self.settings, f, ensure_ascii=False, indent=2)
+            logger.info('保存 Bot 设置成功')
+        except Exception as e:
+            logger.error(f'保存 Bot 设置失败: {e}')
+
+    def get_monitor_chat_id(self) -> int:
+        """获取监控群 ID"""
+        try:
+            return int(self.settings.get('monitor_chat_id') or 0)
+        except Exception:
+            return 0
+
+    def set_monitor_chat_id(self, chat_id: int):
+        """设置监控群 ID"""
+        self.settings['monitor_chat_id'] = int(chat_id)
+        self.save_settings()
 
 
 # ===== 记录管理 =====
@@ -1512,6 +1554,7 @@ class BotStates(StatesGroup):
     waiting_for_cooldown = State()
     waiting_for_max_length = State()
     waiting_for_min_age = State()
+    waiting_for_monitor_chat = State()
     # 黑名单移除
     waiting_remove_blacklist_user = State()
 
@@ -1694,6 +1737,15 @@ class Keyboards:
     def back_to_accounts() -> InlineKeyboardMarkup:
         """返回账号管理按钮"""
         keyboard = [[InlineKeyboardButton(text="🔙 返回", callback_data="menu_accounts")]]
+        return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+    @staticmethod
+    def status_menu() -> InlineKeyboardMarkup:
+        """运行状态菜单"""
+        keyboard = [
+            [InlineKeyboardButton(text="🎯 设置监听群", callback_data="set_monitor_chat")],
+            [InlineKeyboardButton(text="🔙 返回主菜单", callback_data="menu_main")]
+        ]
         return InlineKeyboardMarkup(inline_keyboard=keyboard)
     
     @staticmethod
@@ -1982,6 +2034,7 @@ class JTBot:
         os.makedirs(Config.EXPORTS_DIR, exist_ok=True)
         
         # 管理器
+        self.bot_settings_manager = BotSettingsManager(Config.BOT_SETTINGS_FILE)
         self.keyword_manager = KeywordManager(Config.KEYWORDS_FILE)
         self.account_manager = AccountManager(Config.ACCOUNTS_FILE)
         self.filter_manager = FilterManager(Config.FILTER_SETTINGS_FILE)
@@ -1998,6 +2051,7 @@ class JTBot:
         # DM 客户端
         self.dm_clients: Dict[str, TelegramClient] = {}
         self.shutdown_requested = False
+        self.monitor_chat_warning_sent = False
         
         # 代理配置 (必须在 Bot 初始化之前)
         self.proxy = ProxyParser.load_proxy_from_file(Config.PROXY_FILE)
@@ -2945,6 +2999,7 @@ class JTBot:
             
             accounts = self.account_manager.get_all_accounts()
             online_count = sum(1 for acc in accounts if acc['phone'] in self.clients and self.clients[acc['phone']].is_connected())
+            monitor_chat_id = self.bot_settings_manager.get_monitor_chat_id()
             
             text = f"📊 运行状态\n\n"
             text += f"⏱ 运行时间: {hours}小时{minutes}分钟\n"
@@ -2953,12 +3008,83 @@ class JTBot:
             text += f"📨 接收消息: {self.stats['messages_received']}\n"
             text += f"🔔 关键词匹配: {self.stats['keywords_matched']}\n"
             text += f"🚫 过滤拦截: {self.stats['filtered_count']}\n"
-            text += f"📝 记录数: {len(self.record_manager.records)}"
+            text += f"📝 记录数: {len(self.record_manager.records)}\n"
+            text += f"🎯 监听群: {monitor_chat_id if monitor_chat_id else '未设置'}"
             
             await callback.message.edit_text(
                 text,
-                reply_markup=Keyboards.back_to_main()
+                reply_markup=Keyboards.status_menu()
             )
+
+        @self.dp.callback_query(F.data == "set_monitor_chat")
+        async def set_monitor_chat(callback: CallbackQuery, state: FSMContext):
+            if callback.from_user.id != Config.ADMIN_USER_ID:
+                await callback.answer("⛔ 无权限访问")
+                return
+
+            current_chat_id = self.bot_settings_manager.get_monitor_chat_id()
+            current_text = str(current_chat_id) if current_chat_id else "未设置"
+
+            await callback.message.edit_text(
+                "🎯 设置监听群\n\n"
+                "请发送监听群 ID 或公开群 @username / t.me 链接\n\n"
+                "支持示例：\n"
+                "• -1001234567890\n"
+                "• @mygroup\n"
+                "• https://t.me/mygroup\n\n"
+                f"当前: {current_text}",
+                reply_markup=Keyboards.status_menu()
+            )
+            await state.set_state(BotStates.waiting_for_monitor_chat)
+            await callback.answer()
+
+        @self.dp.message(BotStates.waiting_for_monitor_chat)
+        async def receive_monitor_chat(message: Message, state: FSMContext):
+            if message.from_user.id != Config.ADMIN_USER_ID:
+                return
+
+            chat_input = (message.text or "").strip()
+            if not chat_input:
+                await message.answer("❌ 请输入监听群 ID 或 @username / t.me 链接")
+                return
+
+            try:
+                chat_id = 0
+                display_name = chat_input
+
+                if re.fullmatch(r'-?\d+', chat_input):
+                    chat_id = int(chat_input)
+                    try:
+                        chat = await self.bot.get_chat(chat_id)
+                        display_name = getattr(chat, 'title', None) or getattr(chat, 'username', None) or str(chat_id)
+                    except Exception:
+                        display_name = str(chat_id)
+                else:
+                    normalized = chat_input
+                    if normalized.startswith('https://t.me/'):
+                        normalized = normalized.replace('https://t.me/', '@', 1)
+                    if normalized.startswith('http://t.me/'):
+                        normalized = normalized.replace('http://t.me/', '@', 1)
+                    if not normalized.startswith('@'):
+                        normalized = f"@{normalized.lstrip('/')}"
+
+                    chat = await self.bot.get_chat(normalized)
+                    chat_id = chat.id
+                    display_name = getattr(chat, 'title', None) or getattr(chat, 'username', None) or normalized
+
+                self.bot_settings_manager.set_monitor_chat_id(chat_id)
+                self.monitor_chat_warning_sent = False
+
+                await message.answer(
+                    f"✅ 监听群已更新\n\n名称: {display_name}\nID: {chat_id}",
+                    reply_markup=Keyboards.status_menu()
+                )
+                await state.clear()
+            except Exception as e:
+                logger.error(f"设置监听群失败: {e}")
+                await message.answer(
+                    f"❌ 设置失败: {e}\n\n请确认 Bot 已经在目标群里，或者直接发送正确的群 ID。"
+                )
         
         @self.dp.callback_query(F.data == "menu_help")
         async def menu_help(callback: CallbackQuery):
@@ -5283,9 +5409,16 @@ class JTBot:
                     chat_username=chat_username
                 )
                 
+                monitor_chat_id = self.bot_settings_manager.get_monitor_chat_id()
+                if not monitor_chat_id:
+                    if not self.monitor_chat_warning_sent:
+                        self.monitor_chat_warning_sent = True
+                        await self._notify_admin("⚠️ 当前未设置监听群，命中关键词后无法转发。请到后台 [运行状态 -> 设置监听群] 配置。")
+                    return
+
                 # 发送到监控群（带按钮）
                 await self.bot.send_message(
-                    chat_id=Config.MONITOR_CHAT_ID,
+                    chat_id=monitor_chat_id,
                     text=forward_text,
                     reply_markup=action_buttons,
                     parse_mode="HTML"
