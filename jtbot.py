@@ -5385,9 +5385,6 @@ class JTBot:
             message = event.message
             self.stats['messages_received'] += 1
             
-            # 添加消息接收时间日志
-            logger.info(f"📩 收到消息 [{monitor_phone}] 时间: {receive_time.strftime('%H:%M:%S.%f')[:-3]}")
-            
             # 消息去重：多个账号在同一群组时，同一消息只处理一次
             chat_id = event.chat_id
             msg_id = message.id
@@ -5416,13 +5413,16 @@ class JTBot:
             # 黑名单检查
             if self.blacklist_manager.is_user_blocked(sender.id):
                 self.stats['filtered_count'] += 1
-                logger.debug(f"用户已屏蔽: {sender.id}")
+                logger.info(f"🚫 黑名单已拦截用户消息: user={sender.id} chat={chat_id} monitor={monitor_phone}")
                 return
             
             if self.blacklist_manager.is_chat_blocked(chat_id):
                 self.stats['filtered_count'] += 1
-                logger.debug(f"群组已屏蔽: {chat_id}")
+                logger.info(f"🚫 黑名单已拦截群组消息: chat={chat_id} monitor={monitor_phone}")
                 return
+
+            # 仅记录真正进入后续过滤/匹配流程的消息，避免黑名单用户造成“仍在监听”的错觉
+            logger.info(f"📩 收到消息 [{monitor_phone}] 时间: {receive_time.strftime('%H:%M:%S.%f')[:-3]}")
             
             # 消息长度过滤
             max_length = self.filter_manager.get_setting('max_message_length')
