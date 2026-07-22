@@ -2110,6 +2110,7 @@ class JTBot:
         # DM 客户端
         self.dm_clients: Dict[str, TelegramClient] = {}
         self.shutdown_requested = False
+        self.startup_task: Optional[asyncio.Task] = None
         self.monitor_chat_warning_sent = False
         
         # 代理配置 (必须在 Bot 初始化之前)
@@ -2251,6 +2252,40 @@ class JTBot:
                 self.dm_client_tasks.pop(task_phone, None)
 
         task.add_done_callback(_cleanup)
+
+    def _start_startup_task(self):
+        """后台初始化账号连接，避免阻塞管理 Bot 启动"""
+        if self.startup_task and not self.startup_task.done():
+            return
+
+        self.startup_task = asyncio.create_task(self._initialize_runtime_clients())
+
+        def _cleanup(done_task: asyncio.Task):
+            if self.startup_task is done_task:
+                self.startup_task = None
+            try:
+                done_task.result()
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                logger.error(f"后台初始化任务异常: {e}", exc_info=True)
+
+        self.startup_task.add_done_callback(_cleanup)
+
+    async def _stop_startup_task(self):
+        """停止后台初始化任务"""
+        task = self.startup_task
+        self.startup_task = None
+        if not task or task.done():
+            return
+
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            pass
 
     async def _stop_dm_client_task(self, phone: str):
         """停止私信号保活任务"""
@@ -5432,6 +5467,8 @@ class JTBot:
                 @client.on(events.NewMessage())
                 async def handle_msg(event, p=phone):
                     await self.handle_new_message(event, p)
+
+                self._start_client_task(phone, client, "监控号")
                 
             except Exception as e:
                 logger.error(f"启动账号 {phone} 失败: {e}")
@@ -5454,6 +5491,13 @@ class JTBot:
                     self.dm_account_manager.update_account_status(phone, 'failed', False)
         
         logger.info(f"✅ 启动了 {len(self.dm_clients)} 个私信号")
+
+    async def _initialize_runtime_clients(self):
+        """后台初始化监控号和私信号，不阻塞管理后台进入"""
+        logger.info("开始后台初始化监控号和私信号")
+        await self.start_multi_account_clients()
+        await self.start_dm_clients()
+        logger.info("后台初始化完成")
 
     async def _connect_single_dm_client(self, acc: Dict) -> Optional[TelegramClient]:
         """连接单个私信号，失败时自动处理 session 锁重试"""
@@ -6232,6 +6276,8 @@ class JTBot:
 
     async def _disconnect_all_clients(self):
         """关闭所有 Telethon 客户端，供正常停机时调用"""
+        await self._stop_startup_task()
+
         for phone, client in self.clients.items():
             try:
                 await self._safe_disconnect_client(client)
@@ -6262,23 +6308,11 @@ class JTBot:
         logger.info('=' * 50)
         logger.info('🤖 JTBot - 多账号监控系统')
         logger.info('=' * 50)
-        
-        # 启动已注册的监控账号
-        await self.start_multi_account_clients()
-        
-        # 启动私信号客户端，保证自动私信在重启后仍然生效
-        await self.start_dm_clients()
-        
-        # 启动 Bot
-        logger.info('✅ Bot 管理界面已启动')
-        
+
         try:
-            tasks = [asyncio.create_task(self._run_bot_polling_forever())]
-
-            for phone, client in self.clients.items():
-                tasks.append(asyncio.create_task(self._run_client_forever(phone, client, "监控号")))
-
-            await asyncio.gather(*tasks)
+            logger.info('✅ Bot 管理界面已启动')
+            self._start_startup_task()
+            await self._run_bot_polling_forever()
                         
         except KeyboardInterrupt:
             logger.info('收到停止信号，正在关闭...')
