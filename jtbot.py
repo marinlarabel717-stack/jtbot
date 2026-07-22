@@ -2313,6 +2313,29 @@ class JTBot:
             pass
         await asyncio.sleep(0.1)
 
+    def _is_dm_account_runnable(
+        self,
+        phone: str,
+        account: Optional[Dict] = None,
+    ) -> Tuple[bool, str]:
+        """仅允许正常私信号进入启动或自动重连流程"""
+        acc = account or self.dm_account_manager.get_account(phone)
+        if not acc:
+            return False, "账号已被移出私信号池"
+
+        status = acc.get('status', 'unknown')
+        can_send_dm = acc.get('can_send_dm', status == 'active')
+        if status != 'active' or not can_send_dm:
+            return False, f"账号状态为 {status}，不再保持连接"
+
+        return True, ""
+
+    async def _stop_dm_runtime(self, phone: str, client: Optional[TelegramClient] = None):
+        """停止私信号保活任务并断开现有连接"""
+        await self._stop_dm_client_task(phone)
+        current_client = self.dm_clients.pop(phone, None)
+        await self._safe_disconnect_client(current_client or client)
+
     async def request_shutdown(self, reason: str = ""):
         """请求优雅停机，优先停止 Bot polling 再进入清理流程"""
         if self.shutdown_requested:
@@ -4096,6 +4119,10 @@ class JTBot:
                         )
                         
                         logger.info(f"✅ 导入成功: {me.first_name} ({phone}) - {status}")
+
+                        if not self._is_dm_account_runnable(phone)[0]:
+                            await self._safe_disconnect_client(client)
+                            client = None
                         
                         return {
                             'success': True,
@@ -4317,16 +4344,20 @@ class JTBot:
                     client = self.dm_clients.get(phone)
                     if not client or not client.is_connected():
                         self.dm_account_manager.update_account_status(phone, 'failed', False)
+                        await self._stop_dm_runtime(phone, client)
                         return 'failed'
-                    
+                
                     # 检测状态
                     status, can_send_dm = await self.dm_account_manager.check_account_status(client)
                     self.dm_account_manager.update_account_status(phone, status, can_send_dm)
+                    if not self._is_dm_account_runnable(phone)[0]:
+                        await self._stop_dm_runtime(phone, client)
                     return status
                     
                 except Exception as e:
                     logger.error(f"检查账号状态失败 {phone}: {e}")
                     self.dm_account_manager.update_account_status(phone, 'failed', False)
+                    await self._stop_dm_runtime(phone, self.dm_clients.get(phone))
                     return 'failed'
             
             # 并发检查，每批10个
@@ -5457,15 +5488,12 @@ class JTBot:
                     session_file = acc.get('session_file', '')
                     
                     try:
-                        # 1. 断开客户端连接（如果已连接）
-                        if phone in self.dm_clients:
-                            try:
-                                await self._safe_disconnect_client(self.dm_clients[phone])
-                                await self._stop_dm_client_task(phone)
-                                del self.dm_clients[phone]
-                                logger.info(f"已断开私信号连接: {phone}")
-                            except Exception as e:
-                                logger.error(f"断开连接失败 {phone}: {e}")
+                        # 1. 先停保活，再断开连接，避免导出时再次触发自动重连提示
+                        try:
+                            await self._stop_dm_runtime(phone)
+                            logger.info(f"已断开私信号连接: {phone}")
+                        except Exception as e:
+                            logger.error(f"断开连接失败 {phone}: {e}")
                         
                         # 2. 删除所有相关文件
                         if session_file:
@@ -5583,7 +5611,10 @@ class JTBot:
     
     async def start_dm_clients(self):
         """启动所有私信号客户端"""
-        accounts = self.dm_account_manager.get_all_accounts()
+        accounts = [
+            acc for acc in self.dm_account_manager.get_all_accounts()
+            if self._is_dm_account_runnable(acc['phone'], acc)[0]
+        ]
         
         for acc in accounts:
             phone = acc['phone']
@@ -5612,6 +5643,12 @@ class JTBot:
         phone = acc['phone']
         session_file = acc['session_file']
         session_path = os.path.join(Config.DM_SESSIONS_DIR, session_file.replace('.session', ''))
+
+        runnable, reason = self._is_dm_account_runnable(phone, acc)
+        if not runnable:
+            logger.info(f"跳过连接私信号 {phone}: {reason}")
+            await self._stop_dm_runtime(phone)
+            return None
 
         existing = self.dm_clients.get(phone)
         if existing and existing.is_connected():
@@ -6359,6 +6396,12 @@ class JTBot:
             try:
                 if self.shutdown_requested:
                     break
+                if client_label == "私信号":
+                    runnable, reason = self._is_dm_account_runnable(phone)
+                    if not runnable:
+                        logger.info(f"{client_label} {phone} 停止保活: {reason}")
+                        await self._stop_dm_runtime(phone, client)
+                        break
                 if client_label == "监控号" and client.is_connected():
                     self._mark_monitor_runtime_status(phone, 'online')
                 if not client.is_connected():
@@ -6369,6 +6412,12 @@ class JTBot:
                 await client.run_until_disconnected()
                 if self.shutdown_requested:
                     break
+                if client_label == "私信号":
+                    runnable, reason = self._is_dm_account_runnable(phone)
+                    if not runnable:
+                        logger.info(f"{client_label} {phone} 断开后停止保活: {reason}")
+                        await self._stop_dm_runtime(phone, client)
+                        break
                 if client_label == "监控号":
                     self._mark_monitor_runtime_status(phone, 'reconnecting')
                 logger.warning(f"{client_label} {phone} 已断开，5秒后尝试重连")
