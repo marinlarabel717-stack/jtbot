@@ -2075,6 +2075,8 @@ class JTBot:
         # 多账号客户端
         self.clients: Dict[str, TelegramClient] = {}
         self.client_tasks: Dict[str, asyncio.Task] = {}
+        self.monitor_runtime_status: Dict[str, Dict] = {}
+        self.monitor_disconnect_grace_seconds = 15
         
         # 防重复转发缓存: {user_id}_{keyword} -> last_trigger_time
         cooldown_seconds = self.filter_manager.get_setting('cooldown_minutes') * 60
@@ -2123,7 +2125,58 @@ class JTBot:
     def _get_phone_by_hash(self, phone_hash: int) -> Optional[str]:
         """通过hash获取phone"""
         return self.phone_hash_map.get(phone_hash)
-    
+
+    def _mark_monitor_runtime_status(self, phone: str, state: str):
+        """记录监控号最近一次运行状态，避免菜单里在线数瞬时抖动"""
+        self.monitor_runtime_status[phone] = {
+            'state': state,
+            'updated_at': datetime.now()
+        }
+
+    def _clear_monitor_runtime_status(self, phone: str):
+        """清理监控号运行状态缓存"""
+        self.monitor_runtime_status.pop(phone, None)
+
+    def _is_monitor_online(self, phone: str) -> bool:
+        """判断监控号是否在线，对短暂重连窗口做平滑处理"""
+        client = self.clients.get(phone)
+        if client and client.is_connected():
+            self._mark_monitor_runtime_status(phone, 'online')
+            return True
+
+        runtime_status = self.monitor_runtime_status.get(phone)
+        if not runtime_status:
+            return False
+
+        if runtime_status.get('state') == 'reconnecting':
+            updated_at = runtime_status.get('updated_at')
+            if updated_at and (datetime.now() - updated_at).total_seconds() <= self.monitor_disconnect_grace_seconds:
+                return True
+
+        return False
+
+    def _get_monitor_online_count(self, accounts: List[Dict]) -> int:
+        """统计在线监控号数量"""
+        return sum(
+            1 for acc in accounts
+            if acc.get('enabled', True) and self._is_monitor_online(acc['phone'])
+        )
+
+    def _start_client_task(self, phone: str, client: TelegramClient, client_label: str):
+        """为账号启动保活任务，避免重复创建"""
+        existing_task = self.client_tasks.get(phone)
+        if existing_task and not existing_task.done():
+            return
+
+        task = asyncio.create_task(self._run_client_forever(phone, client, client_label))
+        self.client_tasks[phone] = task
+
+        def _cleanup(done_task: asyncio.Task, task_phone: str = phone):
+            if self.client_tasks.get(task_phone) is done_task:
+                self.client_tasks.pop(task_phone, None)
+
+        task.add_done_callback(_cleanup)
+
     def _update_phone_hash_map(self):
         """更新phone hash映射"""
         self.phone_hash_map.clear()
@@ -2209,7 +2262,7 @@ class JTBot:
                 return
             
             accounts = self.account_manager.get_all_accounts()
-            online_count = sum(1 for acc in accounts if acc['phone'] in self.clients and self.clients[acc['phone']].is_connected())
+            online_count = self._get_monitor_online_count(accounts)
             keywords_count = len(self.keyword_manager.keywords)
             
             # DM 统计
@@ -2232,7 +2285,7 @@ class JTBot:
             await callback.answer()
             
             accounts = self.account_manager.get_all_accounts()
-            online_count = sum(1 for acc in accounts if acc['phone'] in self.clients and self.clients[acc['phone']].is_connected())
+            online_count = self._get_monitor_online_count(accounts)
             keywords_count = len(self.keyword_manager.keywords)
             
             # DM 统计
@@ -2255,7 +2308,7 @@ class JTBot:
             await callback.answer()
             
             accounts = self.account_manager.get_all_accounts()
-            online_count = sum(1 for acc in accounts if acc['phone'] in self.clients and self.clients[acc['phone']].is_connected())
+            online_count = self._get_monitor_online_count(accounts)
             
             text = f"📱 监控账号管理\n\n"
             text += f"已登录账号: {len(accounts)}/{self.account_manager.max_accounts}\n"
@@ -2283,7 +2336,7 @@ class JTBot:
                     name = acc.get('name', '未知')
                     username = acc.get('username', '无')
                     phone = acc['phone']
-                    is_online = phone in self.clients and self.clients[phone].is_connected()
+                    is_online = self._is_monitor_online(phone)
                     status = '🟢 在线' if is_online else '🔴 离线'
                     text += f"{i}. {name} (@{username}) {status}\n"
                 
@@ -2421,10 +2474,13 @@ class JTBot:
                 
                 if success:
                     self.clients[phone] = client
+                    self._mark_monitor_runtime_status(phone, 'online')
                     
                     @client.on(events.NewMessage())
                     async def handle_msg(event):
                         await self.handle_new_message(event, phone)
+
+                    self._start_client_task(phone, client, "监控号")
                     
                     await message.answer(
                         f"✅ 登录成功！\n\n"
@@ -2492,10 +2548,13 @@ class JTBot:
                 
                 if success:
                     self.clients[phone] = client
+                    self._mark_monitor_runtime_status(phone, 'online')
                     
                     @client.on(events.NewMessage())
                     async def handle_msg(event):
                         await self.handle_new_message(event, phone)
+
+                    self._start_client_task(phone, client, "监控号")
                     
                     await message.answer(
                         f"✅ 登录成功！\n\n"
@@ -2534,7 +2593,7 @@ class JTBot:
                 await callback.answer("❌ 账号不存在")
                 return
             
-            is_online = phone in self.clients and self.clients[phone].is_connected()
+            is_online = self._is_monitor_online(phone)
             status = '🟢 在线' if is_online else '🔴 离线'
             
             text = f"📱 账号详情\n\n"
@@ -2565,6 +2624,7 @@ class JTBot:
                 except:
                     pass
                 del self.clients[phone]
+                self._clear_monitor_runtime_status(phone)
             
             if self.account_manager.remove_account(phone):
                 await callback.answer("✅ 账号已删除")
@@ -2998,7 +3058,7 @@ class JTBot:
             minutes = int((uptime.total_seconds() % 3600) // 60)
             
             accounts = self.account_manager.get_all_accounts()
-            online_count = sum(1 for acc in accounts if acc['phone'] in self.clients and self.clients[acc['phone']].is_connected())
+            online_count = self._get_monitor_online_count(accounts)
             monitor_chat_id = self.bot_settings_manager.get_monitor_chat_id()
             
             text = f"📊 运行状态\n\n"
@@ -5274,6 +5334,7 @@ class JTBot:
                 logger.info(f"✅ 账号 {me.first_name} ({phone}) 已连接 [{connection_type}]")
                 
                 self.clients[phone] = client
+                self._mark_monitor_runtime_status(phone, 'online')
                 
                 # 使用默认参数绑定当前phone值，避免闭包问题
                 @client.on(events.NewMessage())
@@ -5981,12 +6042,18 @@ class JTBot:
             try:
                 if self.shutdown_requested:
                     break
+                if client_label == "监控号" and client.is_connected():
+                    self._mark_monitor_runtime_status(phone, 'online')
                 if not client.is_connected():
                     await client.connect()
+                    if client_label == "监控号":
+                        self._mark_monitor_runtime_status(phone, 'online')
                     logger.info(f"🔄 {client_label} {phone} 已自动重连")
                 await client.run_until_disconnected()
                 if self.shutdown_requested:
                     break
+                if client_label == "监控号":
+                    self._mark_monitor_runtime_status(phone, 'reconnecting')
                 logger.warning(f"{client_label} {phone} 已断开，5秒后尝试重连")
                 await self._notify_admin(f"⚠️ {client_label} {phone} 已断开，正在自动重连")
             except asyncio.CancelledError:
@@ -5994,6 +6061,8 @@ class JTBot:
             except Exception as e:
                 if self.shutdown_requested:
                     break
+                if client_label == "监控号":
+                    self._mark_monitor_runtime_status(phone, 'reconnecting')
                 logger.error(f"{client_label} {phone} 运行异常: {e}", exc_info=True)
                 await self._notify_admin(f"⚠️ {client_label} {phone} 运行异常，5秒后自动重连\n原因: {e}")
             await asyncio.sleep(5)
@@ -6005,6 +6074,7 @@ class JTBot:
                 await client.disconnect()
             except Exception:
                 pass
+            self._clear_monitor_runtime_status(phone)
         for phone, client in self.dm_clients.items():
             try:
                 await client.disconnect()
