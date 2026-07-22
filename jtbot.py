@@ -7,11 +7,13 @@ JTBot - Telegram 关键词监控机器人
 import asyncio
 import csv
 import glob
+import inspect
 import json
 import logging
 import os
 import random
 import re
+import signal
 import time
 import zipfile
 from datetime import datetime, timedelta
@@ -2310,6 +2312,24 @@ class JTBot:
         except Exception:
             pass
         await asyncio.sleep(0.1)
+
+    async def request_shutdown(self, reason: str = ""):
+        """请求优雅停机，优先停止 Bot polling 再进入清理流程"""
+        if self.shutdown_requested:
+            return
+
+        self.shutdown_requested = True
+        if reason:
+            logger.info(f"收到停机请求: {reason}")
+
+        stop_polling = getattr(self.dp, 'stop_polling', None)
+        if callable(stop_polling):
+            try:
+                result = stop_polling()
+                if inspect.isawaitable(result):
+                    await result
+            except Exception as e:
+                logger.warning(f"停止 Bot polling 失败: {e}")
 
     @staticmethod
     def _is_session_locked_error(error: Exception) -> bool:
@@ -6298,6 +6318,17 @@ class JTBot:
         if all_tasks:
             await asyncio.gather(*all_tasks, return_exceptions=True)
 
+        try:
+            close_session = getattr(self.bot.session, 'close', None)
+            if callable(close_session):
+                result = close_session()
+                if inspect.isawaitable(result):
+                    await result
+        except Exception:
+            pass
+
+        await asyncio.sleep(0.2)
+
         self.client_tasks.clear()
         self.dm_client_tasks.clear()
         self.clients.clear()
@@ -6329,6 +6360,19 @@ async def main():
     """主函数"""
     try:
         bot = JTBot()
+
+        loop = asyncio.get_running_loop()
+        for sig in (getattr(signal, 'SIGINT', None), getattr(signal, 'SIGTERM', None)):
+            if sig is None:
+                continue
+            try:
+                loop.add_signal_handler(
+                    sig,
+                    lambda s=sig: asyncio.create_task(bot.request_shutdown(s.name))
+                )
+            except (NotImplementedError, RuntimeError, ValueError):
+                pass
+
         await bot.start()
     except Exception as e:
         logger.error(f'❌ 程序异常: {e}', exc_info=True)
