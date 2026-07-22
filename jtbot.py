@@ -5507,6 +5507,23 @@ class JTBot:
         if last_error:
             raise last_error
         return None
+
+    async def _get_connected_dm_client(self, acc: Dict) -> Optional[TelegramClient]:
+        """获取可用的私信客户端；未连接时尝试按需重连一次"""
+        phone = acc['phone']
+        client = self.dm_clients.get(phone)
+
+        if client and client.is_connected():
+            return client
+
+        try:
+            client = await self._connect_single_dm_client(acc)
+            if client and client.is_connected():
+                return client
+        except Exception as e:
+            logger.warning(f"私信号 {phone} 按需重连失败: {e}")
+
+        return None
     
     async def handle_new_message(self, event, monitor_phone: str):
         """处理新消息 - 包含完整过滤逻辑"""
@@ -5691,19 +5708,31 @@ class JTBot:
                 return
             
             logger.info(f"✅ 私信条件检查通过，可用私信号: {len(available_accounts)} 个")
-            
-            # 随机选择一个账号
-            dm_account = random.choice(available_accounts)
-            dm_phone = dm_account['phone']
-            
-            logger.info(f"📱 选择私信号: {dm_phone}")
-            
-            # 获取DM客户端
-            dm_client = self.dm_clients.get(dm_phone)
-            if not dm_client or not dm_client.is_connected():
-                logger.info(f"⏭️ 跳过私信: 私信号 {dm_phone} 未连接")
-                await self._notify_dm_issue(sender, f"私信号未连接: {dm_phone}", dm_phone=dm_phone)
+
+            # 优先使用当前在线账号；如果都不在线，则逐个尝试按需重连
+            candidate_accounts = available_accounts.copy()
+            random.shuffle(candidate_accounts)
+
+            dm_account = None
+            dm_client = None
+            for candidate in candidate_accounts:
+                candidate_phone = candidate['phone']
+                candidate_client = await self._get_connected_dm_client(candidate)
+                if candidate_client and candidate_client.is_connected():
+                    dm_account = candidate
+                    dm_client = candidate_client
+                    logger.info(f"📱 选择私信号: {candidate_phone}")
+                    break
+                logger.info(f"⏭️ 私信号 {candidate_phone} 当前不可用，尝试下一个")
+
+            if not dm_account or not dm_client:
+                total = len(self.dm_account_manager.get_all_accounts())
+                connected = len([client for client in self.dm_clients.values() if client.is_connected()])
+                logger.info(f"⏭️ 跳过私信: 没有在线私信号可用于发送 (总数: {total}, 已连接: {connected})")
+                await self._notify_dm_issue(sender, f"没有在线私信号可用于发送（总数 {total}，已连接 {connected}）")
                 return
+
+            dm_phone = dm_account['phone']
             
             # 随机选择一个话术
             template = self.dm_template_manager.get_random_template()
