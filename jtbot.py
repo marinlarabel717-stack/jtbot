@@ -1974,6 +1974,12 @@ class JTBot:
     
     def __init__(self):
         Config.validate()
+
+        # 确保目录先存在，避免各管理器首启保存配置时报 No such file or directory
+        os.makedirs(Config.CONFIG_DIR, exist_ok=True)
+        os.makedirs(Config.SESSIONS_DIR, exist_ok=True)
+        os.makedirs(Config.DM_SESSIONS_DIR, exist_ok=True)
+        os.makedirs(Config.EXPORTS_DIR, exist_ok=True)
         
         # 管理器
         self.keyword_manager = KeywordManager(Config.KEYWORDS_FILE)
@@ -1989,13 +1995,9 @@ class JTBot:
         self.dm_settings_manager = DMSettingsManager(Config.DM_SETTINGS_FILE)
         self.dm_sticker_manager = DMStickerManager()
         
-        # 确保目录存在
-        os.makedirs(Config.CONFIG_DIR, exist_ok=True)
-        os.makedirs(Config.DM_SESSIONS_DIR, exist_ok=True)
-        os.makedirs(Config.EXPORTS_DIR, exist_ok=True)
-        
         # DM 客户端
         self.dm_clients: Dict[str, TelegramClient] = {}
+        self.shutdown_requested = False
         
         # 代理配置 (必须在 Bot 初始化之前)
         self.proxy = ProxyParser.load_proxy_from_file(Config.PROXY_FILE)
@@ -5827,10 +5829,15 @@ class JTBot:
         while True:
             try:
                 await self.dp.start_polling(self.bot)
-                logger.warning("Bot polling 已退出，5秒后尝试重启")
+                logger.info("Bot polling 已正常退出，开始关闭所有客户端")
+                self.shutdown_requested = True
+                await self._disconnect_all_clients()
+                break
             except asyncio.CancelledError:
                 raise
             except Exception as e:
+                if self.shutdown_requested:
+                    break
                 logger.error(f"Bot polling 异常: {e}", exc_info=True)
                 await self._notify_admin(f"⚠️ Bot polling 异常，5秒后自动重启\n原因: {e}")
             await asyncio.sleep(5)
@@ -5839,18 +5846,37 @@ class JTBot:
         """监控 Telethon 客户端断线并自动重连"""
         while True:
             try:
+                if self.shutdown_requested:
+                    break
                 if not client.is_connected():
                     await client.connect()
                     logger.info(f"🔄 {client_label} {phone} 已自动重连")
                 await client.run_until_disconnected()
+                if self.shutdown_requested:
+                    break
                 logger.warning(f"{client_label} {phone} 已断开，5秒后尝试重连")
                 await self._notify_admin(f"⚠️ {client_label} {phone} 已断开，正在自动重连")
             except asyncio.CancelledError:
                 raise
             except Exception as e:
+                if self.shutdown_requested:
+                    break
                 logger.error(f"{client_label} {phone} 运行异常: {e}", exc_info=True)
                 await self._notify_admin(f"⚠️ {client_label} {phone} 运行异常，5秒后自动重连\n原因: {e}")
             await asyncio.sleep(5)
+
+    async def _disconnect_all_clients(self):
+        """关闭所有 Telethon 客户端，供正常停机时调用"""
+        for phone, client in self.clients.items():
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+        for phone, client in self.dm_clients.items():
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
     
     async def start(self):
         """启动机器人"""
@@ -5883,18 +5909,8 @@ class JTBot:
         except Exception as e:
             logger.error(f'运行时错误: {e}', exc_info=True)
         finally:
-            # 断开所有监控客户端
-            for phone, client in self.clients.items():
-                try:
-                    await client.disconnect()
-                except:
-                    pass
-            # 断开所有DM客户端
-            for phone, client in self.dm_clients.items():
-                try:
-                    await client.disconnect()
-                except:
-                    pass
+            self.shutdown_requested = True
+            await self._disconnect_all_clients()
             logger.info('机器人已停止')
 
 
