@@ -387,10 +387,10 @@ class FilterManager:
         self.settings_file = settings_file
         self.settings = {
             'cooldown_minutes': 5,
-            'max_message_length': 100,  # 消息长度限制（字符数）
-            'filter_no_username': True,
+            'max_message_length': 500,  # 消息长度限制（字符数）
+            'filter_no_username': False,
             'filter_no_avatar': False,
-            'min_account_age_days': 7
+            'min_account_age_days': 0
         }
         self.load_settings()
     
@@ -1343,8 +1343,8 @@ class DMSettingsManager:
             'batch_rest_min': 180,
             'batch_rest_max': 480,
             'daily_limit': 50,
-            'active_hours_start': 9,
-            'active_hours_end': 22,
+            'active_hours_start': 0,
+            'active_hours_end': 24,
             'send_sticker_first': False,  # 是否先发贴纸打招呼
             'sticker_delay_min': 1.0,     # 贴纸后延迟最小秒数
             'sticker_delay_max': 3.0      # 贴纸后延迟最大秒数
@@ -3448,35 +3448,7 @@ class JTBot:
                 session_path = os.path.join(Config.DM_SESSIONS_DIR, session_file.replace('.session', ''))
                 
                 try:
-                    # 尝试代理连接
-                    connection_type = 'unknown'
-                    client = None
-                    
-                    if self.proxy:
-                        try:
-                            client = TelegramClient(
-                                session_path,
-                                Config.API_ID,
-                                Config.API_HASH,
-                                proxy=self.proxy
-                            )
-                            await asyncio.wait_for(client.connect(), timeout=10)
-                            connection_type = 'proxy'
-                        except asyncio.TimeoutError:
-                            logger.info(f"代理连接超时，尝试本地连接: {phone}")
-                            if client:
-                                await client.disconnect()
-                            client = None
-                    
-                    if not client:
-                        # 本地连接
-                        client = TelegramClient(
-                            session_path,
-                            Config.API_ID,
-                            Config.API_HASH
-                        )
-                        await client.connect()
-                        connection_type = 'local'
+                    client, connection_type = await self._create_telegram_client(session_path)
                     
                     if not await client.is_user_authorized():
                         logger.warning(f"私信号 {phone} session 已过期")
@@ -3523,6 +3495,9 @@ class JTBot:
                             # 保存新连接的客户端
                             if result['client'] and not result.get('already_connected'):
                                 self.dm_clients[result['phone']] = result['client']
+                                asyncio.create_task(
+                                    self._run_client_forever(result['phone'], result['client'], "私信号")
+                                )
                         else:
                             failed += 1
                     else:
@@ -5157,21 +5132,18 @@ class JTBot:
             session_path = os.path.join(Config.SESSIONS_DIR, session_file)
             
             try:
-                client = TelegramClient(
-                    session_path,
-                    Config.API_ID,
-                    Config.API_HASH,
-                    proxy=self.proxy
-                )
-                
-                await client.connect()
+                client, connection_type = await self._create_telegram_client(session_path)
                 
                 if not await client.is_user_authorized():
                     logger.warning(f"账号 {phone} session 已过期，需要重新登录")
+                    try:
+                        await client.disconnect()
+                    except Exception:
+                        pass
                     continue
                 
                 me = await client.get_me()
-                logger.info(f"✅ 账号 {me.first_name} ({phone}) 已连接")
+                logger.info(f"✅ 账号 {me.first_name} ({phone}) 已连接 [{connection_type}]")
                 
                 self.clients[phone] = client
                 
@@ -5195,35 +5167,7 @@ class JTBot:
             session_path = os.path.join(Config.DM_SESSIONS_DIR, session_file.replace('.session', ''))
             
             try:
-                # 尝试代理连接
-                connection_type = 'unknown'
-                client = None
-                
-                if self.proxy:
-                    try:
-                        client = TelegramClient(
-                            session_path,
-                            Config.API_ID,
-                            Config.API_HASH,
-                            proxy=self.proxy
-                        )
-                        await asyncio.wait_for(client.connect(), timeout=10)
-                        connection_type = 'proxy'
-                    except asyncio.TimeoutError:
-                        logger.info(f"代理连接超时，尝试本地连接: {phone}")
-                        if client:
-                            await client.disconnect()
-                        client = None
-                
-                if not client:
-                    # 本地连接
-                    client = TelegramClient(
-                        session_path,
-                        Config.API_ID,
-                        Config.API_HASH
-                    )
-                    await client.connect()
-                    connection_type = 'local'
+                client, connection_type = await self._create_telegram_client(session_path)
                 
                 if not await client.is_user_authorized():
                     logger.warning(f"私信号 {phone} session 已过期")
@@ -5267,7 +5211,7 @@ class JTBot:
             # 标记为已处理
             self.processed_messages[msg_key] = time.time()
             
-            text = message.text or ''
+            text = message.raw_text or message.text or message.message or ''
             if not text:
                 return
             
@@ -5378,16 +5322,19 @@ class JTBot:
             # 检查DM功能是否开启
             if not self.dm_settings_manager.get_setting('enabled'):
                 logger.info(f"⏭️ 跳过私信: DM功能未开启")
+                await self._notify_dm_issue(sender, "DM功能未开启")
                 return
             
             # 检查用户是否有用户名
             if not username:
                 logger.info(f"⏭️ 跳过私信: 用户 {user_id} 没有用户名")
+                await self._notify_dm_issue(sender, "目标用户没有用户名")
                 return
             
             # 检查用户是否已被私信过
             if self.dm_record_manager.is_user_sent(user_id):
                 logger.info(f"⏭️ 跳过私信: 用户 {user_id} 已被私信过")
+                await self._notify_dm_issue(sender, "该用户在冷却期内已被私信过")
                 return
             
             # 检查是否在活跃时段
@@ -5396,6 +5343,7 @@ class JTBot:
                 start = self.dm_settings_manager.get_setting('active_hours_start')
                 end = self.dm_settings_manager.get_setting('active_hours_end')
                 logger.info(f"⏭️ 跳过私信: 当前{current_hour}点，活跃时段{start}-{end}点")
+                await self._notify_dm_issue(sender, f"当前不在私信活跃时段内（当前 {current_hour} 点，设置 {start}-{end} 点）")
                 return
             
             # 获取可用账号
@@ -5406,6 +5354,7 @@ class JTBot:
                 total = len(self.dm_account_manager.get_all_accounts())
                 connected = len(self.dm_clients)
                 logger.info(f"⏭️ 跳过私信: 没有可用私信号 (总数: {total}, 已连接: {connected})")
+                await self._notify_dm_issue(sender, f"没有可用私信号（总数 {total}，已连接 {connected}）")
                 return
             
             logger.info(f"✅ 私信条件检查通过，可用私信号: {len(available_accounts)} 个")
@@ -5420,12 +5369,14 @@ class JTBot:
             dm_client = self.dm_clients.get(dm_phone)
             if not dm_client or not dm_client.is_connected():
                 logger.info(f"⏭️ 跳过私信: 私信号 {dm_phone} 未连接")
+                await self._notify_dm_issue(sender, f"私信号未连接: {dm_phone}", dm_phone=dm_phone)
                 return
             
             # 随机选择一个话术
             template = self.dm_template_manager.get_random_template()
             if not template:
                 logger.info(f"⏭️ 跳过私信: 没有可用的话术模板")
+                await self._notify_dm_issue(sender, "没有可用的话术模板", dm_phone=dm_phone)
                 return
             
             logger.info(f"📝 选择话术: ID={template['id']}, 类型={template['type']}")
@@ -5446,14 +5397,16 @@ class JTBot:
                     await dm_client.connect()
                     if not await dm_client.is_user_authorized():
                         logger.error(f"私信号 {dm_phone} 未授权")
+                        await self._notify_dm_issue(sender, f"私信号未授权: {dm_phone}", dm_phone=dm_phone, template=template)
                         return
                     logger.info(f"私信号 {dm_phone} 重新连接成功")
                 except Exception as e:
                     logger.error(f"重新连接失败 {dm_phone}: {e}")
+                    await self._notify_dm_issue(sender, f"私信号重连失败: {e}", dm_phone=dm_phone, template=template)
                     return
             
             # 发送私信 - 传递完整的sender对象
-            success = await self._send_dm_by_template(
+            success, fail_reason = await self._send_dm_by_template(
                 dm_client=dm_client,
                 user=sender,  # 传递完整的user对象而不是user_id
                 template=template
@@ -5519,12 +5472,14 @@ class JTBot:
                     template_id=template['id'],
                     template_type=template['type'],
                     status='failed',
-                    error='SEND_FAILED'
+                    error=fail_reason or 'SEND_FAILED'
                 )
-                logger.warning(f"❌ 私信发送失败: {user_id}")
+                logger.warning(f"❌ 私信发送失败: {user_id} - {fail_reason}")
+                await self._notify_dm_issue(sender, fail_reason or "未知发送失败", dm_phone=dm_phone, template=template)
                 
         except Exception as e:
             logger.error(f"自动私信失败: {e}", exc_info=True)
+            await self._notify_dm_issue(sender, f"自动私信流程异常: {e}")
     
     def _get_template_type_name(self, type_code: str) -> str:
         """获取话术类型名称"""
@@ -5557,8 +5512,74 @@ class JTBot:
             entities.append(MessageEntityMention(offset, length))
         
         return entities if entities else None
+
+    async def _notify_admin(self, text: str, parse_mode: Optional[str] = None):
+        """向管理员发送通知，避免单处异常导致主流程中断"""
+        try:
+            await self.bot.send_message(
+                Config.ADMIN_USER_ID,
+                text,
+                parse_mode=parse_mode,
+                disable_web_page_preview=True
+            )
+        except Exception as e:
+            logger.error(f"发送管理员通知失败: {e}")
+
+    async def _notify_dm_issue(self, sender, reason: str, dm_phone: str = '', template: Optional[Dict] = None):
+        """汇报自动私信跳过/失败原因"""
+        username = getattr(sender, 'username', '') or '无'
+        user_id = getattr(sender, 'id', 0)
+        lines = [
+            "⚠️ 自动私信未完成",
+            "",
+            f"目标用户: @{username}" if username != '无' else "目标用户: 无用户名",
+            f"用户ID: {user_id}",
+            f"原因: {reason}",
+        ]
+        if dm_phone:
+            lines.append(f"私信号: {dm_phone}")
+        if template:
+            lines.append(f"话术: {template.get('id', 0)} / {self._get_template_type_name(template.get('type', 'unknown'))}")
+        await self._notify_admin("\n".join(lines))
+
+    async def _create_telegram_client(self, session_path: str, allow_proxy: bool = True) -> Tuple[TelegramClient, str]:
+        """创建并连接一个更稳健的 Telethon 客户端，代理失败时自动回落本地连接"""
+        client_kwargs = {
+            'request_retries': 5,
+            'connection_retries': 999999,
+            'retry_delay': 5,
+            'auto_reconnect': True,
+            'sequential_updates': True,
+        }
+
+        if allow_proxy and self.proxy:
+            proxy_client = TelegramClient(
+                session_path,
+                Config.API_ID,
+                Config.API_HASH,
+                proxy=self.proxy,
+                **client_kwargs
+            )
+            try:
+                await asyncio.wait_for(proxy_client.connect(), timeout=15)
+                return proxy_client, 'proxy'
+            except Exception as e:
+                logger.warning(f"代理连接失败，回落本地连接 {session_path}: {e}")
+                try:
+                    await proxy_client.disconnect()
+                except Exception:
+                    pass
+
+        local_client = TelegramClient(
+            session_path,
+            Config.API_ID,
+            Config.API_HASH,
+            **client_kwargs
+        )
+        await local_client.connect()
+        return local_client, 'local'
     
-    async def _send_dm_by_template(self, dm_client: TelegramClient, user, template: Dict) -> bool:
+    async def _send_dm_by_template(self, dm_client: TelegramClient, user, template: Dict) -> Tuple[bool, str]:
         """根据话术模板发送私信
         
         Args:
@@ -5570,12 +5591,12 @@ class JTBot:
             # 确保客户端已连接
             if not dm_client.is_connected():
                 logger.error("DM客户端未连接")
-                return False
+                return False, "DM客户端未连接"
             
             # 检查用户是否有用户名
             if not hasattr(user, 'username') or not user.username:
                 logger.warning(f"用户 {getattr(user, 'id', 'Unknown')} 没有用户名，跳过发送")
-                return False
+                return False, "目标用户没有用户名"
             
             # 验证用户实体是否可被联系 - 使用用户名获取实体
             try:
@@ -5585,19 +5606,19 @@ class JTBot:
                 # 检查是否是机器人
                 if entity.bot:
                     logger.warning(f"用户 @{user.username} 是机器人，无法发送消息")
-                    return False
+                    return False, "目标用户是机器人"
                 
                 # 检查 Peer 信息是否完整
                 if not hasattr(entity, 'access_hash'):
                     logger.warning(f"用户 @{user.username} 的 Peer 信息不完整")
-                    return False
+                    return False, "目标用户 Peer 信息不完整"
                     
             except PeerIdInvalidError as e:
                 logger.error(f"发送失败: 目标用户 @{user.username} 隐私限制或数据无效: {str(e)}")
-                return False
+                return False, f"目标用户隐私限制或数据无效: {str(e)}"
             except Exception as e:
                 logger.error(f"验证用户实体失败 @{user.username}: {str(e)}")
-                return False
+                return False, f"验证目标用户失败: {str(e)}"
             
             # 1️⃣ 先发贴纸打招呼（如果开启）
             if self.dm_settings_manager.get_setting('send_sticker_first'):
@@ -5653,14 +5674,14 @@ class JTBot:
                     link_preview=False  # 禁用链接预览，避免显示网页预览
                 )
                 logger.info(f"✅ 文本直发成功，@username 已转换为可点击链接")
-                return True
+                return True, ""
                 
             elif template_type == 'postbot':
                 # 图文+按钮 (PostBot格式)
                 postbot_code = content.get('code', '')
                 if not postbot_code:
                     logger.error("PostBot 代码为空")
-                    return False
+                    return False, "PostBot 代码为空"
                 
                 # 通过 PostBot 内联查询发送
                 try:
@@ -5686,14 +5707,14 @@ class JTBot:
                             random_id=random.randint(0, 0x7fffffff)
                         ))
                         logger.info(f"PostBot 消息发送成功，代码: {postbot_code}")
-                        return True
+                        return True, ""
                     else:
                         logger.error(f"PostBot 未返回结果，代码可能无效: {postbot_code}")
-                        return False
+                        return False, f"PostBot 未返回结果，代码可能无效: {postbot_code}"
                         
                 except Exception as e:
                     logger.error(f"PostBot 发送失败: {e}")
-                    return False
+                    return False, f"PostBot 发送失败: {e}"
                 
             elif template_type == 'forward':
                 # 频道转发
@@ -5702,7 +5723,7 @@ class JTBot:
                 match = re.match(r'https?://t\.me/([^/]+)/(\d+)', channel_link)
                 if not match:
                     logger.error(f"无效的频道链接: {channel_link}")
-                    return False
+                    return False, f"无效的频道链接: {channel_link}"
                 
                 channel_username = match.group(1)
                 message_id = int(match.group(2))
@@ -5712,7 +5733,7 @@ class JTBot:
                 
                 # 转发消息 - 使用验证过的entity
                 await dm_client.forward_messages(entity, message_id, channel_entity)
-                return True
+                return True, ""
                 
             elif template_type == 'forward_hidden':
                 # 隐藏来源转发
@@ -5720,7 +5741,7 @@ class JTBot:
                 match = re.match(r'https?://t\.me/([^/]+)/(\d+)', channel_link)
                 if not match:
                     logger.error(f"无效的频道链接: {channel_link}")
-                    return False
+                    return False, f"无效的频道链接: {channel_link}"
                 
                 channel_username = match.group(1)
                 message_id = int(match.group(2))
@@ -5749,18 +5770,18 @@ class JTBot:
                             message=original_msg.text or '',
                             formatting_entities=original_msg.entities  # 保留@链接等
                         )
-                    return True
+                    return True, ""
                 
-                return False
+                return False, "原始频道消息不存在或不可读取"
             
-            return False
+            return False, f"不支持的话术类型: {template.get('type', 'unknown')}"
             
         except PeerIdInvalidError as e:
             logger.error(f"发送失败: 目标用户隐私限制或数据无效: {str(e)}")
-            return False
+            return False, f"目标用户隐私限制或数据无效: {str(e)}"
         except Exception as e:
             logger.error(f"发送私信失败: {e}", exc_info=True)
-            return False
+            return False, f"发送私信失败: {e}"
     
     async def build_forward_message(self, chat, sender: User, message, keywords: List[str], monitor_phone: str) -> str:
         """构建转发消息（使用HTML格式使@username可点击）"""
@@ -5800,6 +5821,36 @@ class JTBot:
         text += f"📝 消息内容:\n{message_text}"
         
         return text
+
+    async def _run_bot_polling_forever(self):
+        """Bot 轮询守护，异常后自动重启"""
+        while True:
+            try:
+                await self.dp.start_polling(self.bot)
+                logger.warning("Bot polling 已退出，5秒后尝试重启")
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.error(f"Bot polling 异常: {e}", exc_info=True)
+                await self._notify_admin(f"⚠️ Bot polling 异常，5秒后自动重启\n原因: {e}")
+            await asyncio.sleep(5)
+
+    async def _run_client_forever(self, phone: str, client: TelegramClient, client_label: str):
+        """监控 Telethon 客户端断线并自动重连"""
+        while True:
+            try:
+                if not client.is_connected():
+                    await client.connect()
+                    logger.info(f"🔄 {client_label} {phone} 已自动重连")
+                await client.run_until_disconnected()
+                logger.warning(f"{client_label} {phone} 已断开，5秒后尝试重连")
+                await self._notify_admin(f"⚠️ {client_label} {phone} 已断开，正在自动重连")
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.error(f"{client_label} {phone} 运行异常: {e}", exc_info=True)
+                await self._notify_admin(f"⚠️ {client_label} {phone} 运行异常，5秒后自动重连\n原因: {e}")
+            await asyncio.sleep(5)
     
     async def start(self):
         """启动机器人"""
@@ -5810,49 +5861,22 @@ class JTBot:
         # 启动已注册的监控账号
         await self.start_multi_account_clients()
         
-        # 私信号客户端改为手动连接，不自动启动
-        # await self.start_dm_clients()
-        logger.info('💡 私信号需要手动连接，请在管理界面点击 [🔌 连接私信号] 按钮')
+        # 启动私信号客户端，保证自动私信在重启后仍然生效
+        await self.start_dm_clients()
         
         # 启动 Bot
         logger.info('✅ Bot 管理界面已启动')
         
         try:
-            # 创建任务
-            bot_task = asyncio.create_task(self.dp.start_polling(self.bot))
-            
-            # 为每个监控客户端创建任务
-            client_tasks = []
+            tasks = [asyncio.create_task(self._run_bot_polling_forever())]
+
             for phone, client in self.clients.items():
-                task = asyncio.create_task(client.run_until_disconnected())
-                client_tasks.append(task)
-            
-            # 为每个DM客户端创建任务
+                tasks.append(asyncio.create_task(self._run_client_forever(phone, client, "监控号")))
+
             for phone, client in self.dm_clients.items():
-                task = asyncio.create_task(client.run_until_disconnected())
-                client_tasks.append(task)
-            
-            # 等待所有任务
-            all_tasks = [bot_task] + client_tasks
-            
-            if all_tasks:
-                done, pending = await asyncio.wait(
-                    all_tasks,
-                    return_when=asyncio.FIRST_EXCEPTION
-                )
-                
-                # 取消未完成的任务
-                for task in pending:
-                    task.cancel()
-                    try:
-                        await task
-                    except asyncio.CancelledError:
-                        pass
-                
-                # 检查异常
-                for task in done:
-                    if task.exception():
-                        raise task.exception()
+                tasks.append(asyncio.create_task(self._run_client_forever(phone, client, "私信号")))
+
+            await asyncio.gather(*tasks)
                         
         except KeyboardInterrupt:
             logger.info('收到停止信号，正在关闭...')
