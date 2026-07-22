@@ -2134,6 +2134,7 @@ class JTBot:
         # 多账号客户端
         self.clients: Dict[str, TelegramClient] = {}
         self.client_tasks: Dict[str, asyncio.Task] = {}
+        self.dm_client_tasks: Dict[str, asyncio.Task] = {}
         self.monitor_runtime_status: Dict[str, Dict] = {}
         self.monitor_disconnect_grace_seconds = 15
         
@@ -2235,6 +2236,50 @@ class JTBot:
                 self.client_tasks.pop(task_phone, None)
 
         task.add_done_callback(_cleanup)
+
+    def _start_dm_client_task(self, phone: str, client: TelegramClient):
+        """为私信号启动保活任务，避免重复创建"""
+        existing_task = self.dm_client_tasks.get(phone)
+        if existing_task and not existing_task.done():
+            return
+
+        task = asyncio.create_task(self._run_client_forever(phone, client, "私信号"))
+        self.dm_client_tasks[phone] = task
+
+        def _cleanup(done_task: asyncio.Task, task_phone: str = phone):
+            if self.dm_client_tasks.get(task_phone) is done_task:
+                self.dm_client_tasks.pop(task_phone, None)
+
+        task.add_done_callback(_cleanup)
+
+    async def _stop_dm_client_task(self, phone: str):
+        """停止私信号保活任务"""
+        task = self.dm_client_tasks.pop(phone, None)
+        if not task or task.done():
+            return
+
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            pass
+
+    async def _safe_disconnect_client(self, client: Optional[TelegramClient]):
+        """安全断开 Telethon 客户端，尽量释放 session 锁"""
+        if not client:
+            return
+        try:
+            await client.disconnect()
+        except Exception:
+            pass
+        await asyncio.sleep(0.1)
+
+    @staticmethod
+    def _is_session_locked_error(error: Exception) -> bool:
+        """判断是否为 Telethon session sqlite 锁冲突"""
+        return 'database is locked' in str(error).lower()
 
     def _update_phone_hash_map(self):
         """更新phone hash映射"""
@@ -3696,27 +3741,11 @@ class JTBot:
                 # 如果已经连接，跳过
                 if phone in self.dm_clients and self.dm_clients[phone].is_connected():
                     return {'success': True, 'phone': phone, 'client': None, 'already_connected': True}
-                
-                session_file = acc['session_file']
-                session_path = os.path.join(Config.DM_SESSIONS_DIR, session_file.replace('.session', ''))
-                
+
                 try:
-                    client, connection_type = await self._create_telegram_client(session_path)
-                    
-                    if not await client.is_user_authorized():
-                        logger.warning(f"私信号 {phone} session 已过期")
-                        self.dm_account_manager.update_account_status(phone, 'failed', False)
-                        await client.disconnect()
-                        return {'success': False, 'phone': phone, 'client': None}
-                    
-                    me = await client.get_me()
-                    logger.info(f"✅ 私信号 {me.first_name} ({phone}) 已连接 [{connection_type}]")
-                    
-                    # 更新连接状态
-                    self.dm_account_manager.update_account_status(phone, acc.get('status', 'active'), acc.get('can_send_dm', True))
-                    
+                    client = await self._connect_single_dm_client(acc)
                     return {
-                        'success': True,
+                        'success': client is not None,
                         'phone': phone,
                         'client': client,
                         'already_connected': False
@@ -3724,7 +3753,6 @@ class JTBot:
                     
                 except Exception as e:
                     logger.error(f"连接私信号 {phone} 失败: {e}")
-                    self.dm_account_manager.update_account_status(phone, 'failed', False)
                     return {'success': False, 'phone': phone, 'client': None}
             
             # 并发连接，每批10个
@@ -3747,10 +3775,7 @@ class JTBot:
                             connected += 1
                             # 保存新连接的客户端
                             if result['client'] and not result.get('already_connected'):
-                                self.dm_clients[result['phone']] = result['client']
-                                asyncio.create_task(
-                                    self._run_client_forever(result['phone'], result['client'], "私信号")
-                                )
+                                self._start_dm_client_task(result['phone'], result['client'])
                         else:
                             failed += 1
                     else:
@@ -3966,6 +3991,7 @@ class JTBot:
                                 # 保存客户端
                                 if result['client']:
                                     self.dm_clients[result['phone']] = result['client']
+                                    self._start_dm_client_task(result['phone'], result['client'])
                             else:
                                 failed_count += 1
                         else:
@@ -5297,7 +5323,8 @@ class JTBot:
                         # 1. 断开客户端连接（如果已连接）
                         if phone in self.dm_clients:
                             try:
-                                await self.dm_clients[phone].disconnect()
+                                await self._safe_disconnect_client(self.dm_clients[phone])
+                                await self._stop_dm_client_task(phone)
                                 del self.dm_clients[phone]
                                 logger.info(f"已断开私信号连接: {phone}")
                             except Exception as e:
@@ -5416,32 +5443,70 @@ class JTBot:
         accounts = self.dm_account_manager.get_all_accounts()
         
         for acc in accounts:
+            try:
+                await self._connect_single_dm_client(acc)
+            except Exception as e:
+                phone = acc['phone']
+                logger.error(f"启动私信号 {phone} 失败: {e}")
+                if self._is_session_locked_error(e):
+                    self.dm_account_manager.update_account_status(phone, acc.get('status', 'active'), acc.get('can_send_dm', True))
+                else:
+                    self.dm_account_manager.update_account_status(phone, 'failed', False)
+        
+        logger.info(f"✅ 启动了 {len(self.dm_clients)} 个私信号")
+
+    async def _connect_single_dm_client(self, acc: Dict) -> Optional[TelegramClient]:
+        """连接单个私信号，失败时自动处理 session 锁重试"""
+        phone = acc['phone']
+        session_file = acc['session_file']
+        session_path = os.path.join(Config.DM_SESSIONS_DIR, session_file.replace('.session', ''))
+
+        existing = self.dm_clients.get(phone)
+        if existing and existing.is_connected():
+            self._start_dm_client_task(phone, existing)
+            return existing
+
+        if existing:
+            await self._safe_disconnect_client(existing)
+            self.dm_clients.pop(phone, None)
+
+        last_error = None
+        client = None
+        for attempt in range(1, 6):
             phone = acc['phone']
-            session_file = acc['session_file']
-            session_path = os.path.join(Config.DM_SESSIONS_DIR, session_file.replace('.session', ''))
-            
             try:
                 client, connection_type = await self._create_telegram_client(session_path)
                 
                 if not await client.is_user_authorized():
                     logger.warning(f"私信号 {phone} session 已过期")
                     self.dm_account_manager.update_account_status(phone, 'failed', False)
-                    await client.disconnect()
-                    continue
-                
+                    await self._safe_disconnect_client(client)
+                    return None
+
                 me = await client.get_me()
                 logger.info(f"✅ 私信号 {me.first_name} ({phone}) 已连接 [{connection_type}]")
                 
                 self.dm_clients[phone] = client
+                self._start_dm_client_task(phone, client)
                 
                 # 更新连接状态
                 self.dm_account_manager.update_account_status(phone, acc.get('status', 'active'), acc.get('can_send_dm', True))
-                
+                return client
             except Exception as e:
-                logger.error(f"启动私信号 {phone} 失败: {e}")
-                self.dm_account_manager.update_account_status(phone, 'failed', False)
-        
-        logger.info(f"✅ 启动了 {len(self.dm_clients)} 个私信号")
+                last_error = e
+                if client:
+                    await self._safe_disconnect_client(client)
+                    client = None
+                if self._is_session_locked_error(e) and attempt < 5:
+                    wait_seconds = attempt * 3
+                    logger.warning(f"私信号 {phone} session 被占用，{wait_seconds}秒后重试 ({attempt}/5)")
+                    await asyncio.sleep(wait_seconds)
+                    continue
+                break
+
+        if last_error:
+            raise last_error
+        return None
     
     async def handle_new_message(self, event, monitor_phone: str):
         """处理新消息 - 包含完整过滤逻辑"""
@@ -5833,10 +5898,7 @@ class JTBot:
                 return proxy_client, 'proxy'
             except Exception as e:
                 logger.warning(f"代理连接失败，回落本地连接 {session_path}: {e}")
-                try:
-                    await proxy_client.disconnect()
-                except Exception:
-                    pass
+                await self._safe_disconnect_client(proxy_client)
 
         local_client = TelegramClient(
             session_path,
@@ -6143,15 +6205,28 @@ class JTBot:
         """关闭所有 Telethon 客户端，供正常停机时调用"""
         for phone, client in self.clients.items():
             try:
-                await client.disconnect()
+                await self._safe_disconnect_client(client)
             except Exception:
                 pass
             self._clear_monitor_runtime_status(phone)
         for phone, client in self.dm_clients.items():
             try:
-                await client.disconnect()
+                await self._safe_disconnect_client(client)
             except Exception:
                 pass
+        
+        all_tasks = list(self.client_tasks.values()) + list(self.dm_client_tasks.values())
+        for task in all_tasks:
+            if not task.done():
+                task.cancel()
+
+        if all_tasks:
+            await asyncio.gather(*all_tasks, return_exceptions=True)
+
+        self.client_tasks.clear()
+        self.dm_client_tasks.clear()
+        self.clients.clear()
+        self.dm_clients.clear()
     
     async def start(self):
         """启动机器人"""
@@ -6173,9 +6248,6 @@ class JTBot:
 
             for phone, client in self.clients.items():
                 tasks.append(asyncio.create_task(self._run_client_forever(phone, client, "监控号")))
-
-            for phone, client in self.dm_clients.items():
-                tasks.append(asyncio.create_task(self._run_client_forever(phone, client, "私信号")))
 
             await asyncio.gather(*tasks)
                         
