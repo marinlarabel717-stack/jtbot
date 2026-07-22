@@ -2336,6 +2336,88 @@ class JTBot:
         """判断是否为 Telethon session sqlite 锁冲突"""
         return 'database is locked' in str(error).lower()
 
+    @staticmethod
+    def _classify_client_error(error: Exception) -> Optional[Dict[str, str]]:
+        """识别不应继续自动重连的账号错误"""
+        error_name = type(error).__name__.lower()
+        error_text = str(error).lower()
+
+        banned_markers = [
+            'phonenumberbannederror',
+            'userdeactivatedbannederror',
+            'userdeactivatederror',
+            'banned',
+            'deactivated',
+            'suspended',
+            'frozen',
+            'violations',
+        ]
+        failed_markers = [
+            'authkeyunregisterederror',
+            'authkeynotfound',
+            'unauthorizederror',
+            'sessionrevokederror',
+            'sessionexpirederror',
+            'auth_key_unregistered',
+            'auth_key_invalid',
+            'auth_key_duplicated',
+            'the key is not registered in the system',
+            'authorization key',
+            'session has been revoked',
+            'session expired',
+            'logged out',
+        ]
+
+        if any(marker in error_name or marker in error_text for marker in banned_markers):
+            return {
+                'status': 'banned',
+                'reason': '账号疑似封禁/注销，已停止自动重连'
+            }
+
+        if any(marker in error_name or marker in error_text for marker in failed_markers):
+            return {
+                'status': 'failed',
+                'reason': 'session/auth key 已失效，已停止自动重连'
+            }
+
+        return None
+
+    async def _handle_non_retryable_client_error(
+        self,
+        phone: str,
+        client: Optional[TelegramClient],
+        client_label: str,
+        error: Exception,
+    ) -> bool:
+        """处理应停止自动重连的账号异常"""
+        classified = self._classify_client_error(error)
+        if not classified:
+            return False
+
+        status = classified['status']
+        reason = classified['reason']
+
+        logger.warning(f"{client_label} {phone} {reason}: {error}")
+
+        if client_label == "私信号":
+            self.dm_account_manager.update_account_status(phone, status, False)
+            current_task = asyncio.current_task()
+            tracked_task = self.dm_client_tasks.get(phone)
+            if tracked_task and tracked_task is not current_task:
+                await self._stop_dm_client_task(phone)
+            else:
+                self.dm_client_tasks.pop(phone, None)
+            current_client = self.dm_clients.pop(phone, None)
+            await self._safe_disconnect_client(current_client or client)
+        else:
+            self.account_manager.update_account_status(phone, False)
+            self._clear_monitor_runtime_status(phone)
+            current_client = self.clients.pop(phone, None)
+            await self._safe_disconnect_client(current_client or client)
+
+        await self._notify_admin(f"⚠️ {client_label} {phone} {reason}\n原因: {error}")
+        return True
+
     def _update_phone_hash_map(self):
         """更新phone hash映射"""
         self.phone_hash_map.clear()
@@ -5471,6 +5553,7 @@ class JTBot:
                 
                 if not await client.is_user_authorized():
                     logger.warning(f"账号 {phone} session 已过期，需要重新登录")
+                    self.account_manager.update_account_status(phone, False)
                     try:
                         await client.disconnect()
                     except Exception:
@@ -5491,6 +5574,9 @@ class JTBot:
                 self._start_client_task(phone, client, "监控号")
                 
             except Exception as e:
+                current_client = self.clients.get(phone)
+                if await self._handle_non_retryable_client_error(phone, current_client, "监控号", e):
+                    continue
                 logger.error(f"启动账号 {phone} 失败: {e}")
         
         logger.info(f"✅ 启动了 {len(self.clients)} 个监控账号")
@@ -5500,10 +5586,12 @@ class JTBot:
         accounts = self.dm_account_manager.get_all_accounts()
         
         for acc in accounts:
+            phone = acc['phone']
             try:
                 await self._connect_single_dm_client(acc)
             except Exception as e:
-                phone = acc['phone']
+                if await self._handle_non_retryable_client_error(phone, self.dm_clients.get(phone), "私信号", e):
+                    continue
                 logger.error(f"启动私信号 {phone} 失败: {e}")
                 if self._is_session_locked_error(e):
                     self.dm_account_manager.update_account_status(phone, acc.get('status', 'active'), acc.get('can_send_dm', True))
@@ -5561,6 +5649,8 @@ class JTBot:
                 if client:
                     await self._safe_disconnect_client(client)
                     client = None
+                if await self._handle_non_retryable_client_error(phone, client or self.dm_clients.get(phone), "私信号", e):
+                    return None
                 if self._is_session_locked_error(e) and attempt < 5:
                     wait_seconds = attempt * 3
                     logger.warning(f"私信号 {phone} session 被占用，{wait_seconds}秒后重试 ({attempt}/5)")
@@ -6287,6 +6377,8 @@ class JTBot:
                 raise
             except Exception as e:
                 if self.shutdown_requested:
+                    break
+                if await self._handle_non_retryable_client_error(phone, client, client_label, e):
                     break
                 if client_label == "监控号":
                     self._mark_monitor_runtime_status(phone, 'reconnecting')
