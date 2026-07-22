@@ -10,6 +10,19 @@ env/
 # Environment files
 .env
 .env.*
+.env.local
+!.env.example
+
+# Runtime data
+jtbot.log
+config/
+sessions/
+dm_sessions/
+exports/
+*.session
+*.session-journal
+*.csv
+*.txt.bak
 
 # IDE files
 .idea/

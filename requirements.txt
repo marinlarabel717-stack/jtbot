@@ -1,0 +1,7 @@
+telethon>=1.24.0
+aiogram>=3.0.0
+python-dotenv>=1.0.0
+aiohttp-socks>=0.8.0
+PySocks>=1.7.1
+cryptg>=0.4.0
+cachetools>=5.0.0
