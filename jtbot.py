@@ -404,7 +404,8 @@ class FilterManager:
             'filter_no_username': False,
             'filter_no_avatar': False,
             'min_account_age_days': 0,
-            'filter_ad_spam': True
+            'filter_ad_spam': True,
+            'ad_block_keywords': ['出', '出售', '卖']
         }
         self.load_settings()
     
@@ -437,6 +438,30 @@ class FilterManager:
         """更新设置值"""
         self.settings[key] = value
         self.save_settings()
+
+    def get_ad_block_keywords(self) -> List[str]:
+        """获取自定义广告拦截关键词"""
+        keywords = self.settings.get('ad_block_keywords', [])
+        if not isinstance(keywords, list):
+            return []
+        return [str(keyword).strip() for keyword in keywords if str(keyword).strip()]
+
+    def update_ad_block_keywords(self, keywords: List[str]):
+        """更新自定义广告拦截关键词列表"""
+        cleaned: List[str] = []
+        seen = set()
+        for keyword in keywords:
+            item = str(keyword).strip()
+            if not item:
+                continue
+            lowered = item.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            cleaned.append(item)
+
+        self.settings['ad_block_keywords'] = cleaned
+        self.save_settings()
     
     def check_user_filter(self, user: User) -> Tuple[bool, str]:
         """
@@ -464,12 +489,17 @@ class FilterManager:
 
     def check_message_filter(self, text: str) -> Tuple[bool, str]:
         """检查消息内容是否像广告垃圾消息"""
-        if not self.settings.get('filter_ad_spam', True):
-            return True, ''
-
         content = (text or '').strip()
         if not content:
             return False, '空消息'
+
+        custom_block_keywords = self.get_ad_block_keywords()
+        matched_custom_keywords = [kw for kw in custom_block_keywords if kw.lower() in content.lower()]
+        if matched_custom_keywords:
+            return False, f"命中广告拦截词({matched_custom_keywords[0]})"
+
+        if not self.settings.get('filter_ad_spam', True):
+            return True, ''
 
         normalized = content.lower()
         matched_keywords = [kw for kw in self.SPAM_HINT_KEYWORDS if kw.lower() in normalized]
@@ -1613,6 +1643,7 @@ class BotStates(StatesGroup):
     waiting_for_cooldown = State()
     waiting_for_max_length = State()
     waiting_for_min_age = State()
+    waiting_for_ad_block_keywords = State()
     waiting_for_monitor_chat = State()
     # 黑名单移除
     waiting_remove_blacklist_user = State()
@@ -1741,6 +1772,8 @@ class Keyboards:
         no_username = '✅ 开启' if settings.get('filter_no_username', True) else '❌ 关闭'
         no_avatar = '✅ 开启' if settings.get('filter_no_avatar', False) else '❌ 关闭'
         ad_spam = '✅ 开启' if settings.get('filter_ad_spam', True) else '❌ 关闭'
+        ad_block_keywords = settings.get('ad_block_keywords', [])
+        ad_block_count = len(ad_block_keywords) if isinstance(ad_block_keywords, list) else 0
         
         keyboard = [
             [InlineKeyboardButton(text=f"🔢 冷却时间: {cooldown}分钟", callback_data="filter_cooldown")],
@@ -1749,6 +1782,7 @@ class Keyboards:
             [InlineKeyboardButton(text=f"👤 无用户名过滤: {no_username}", callback_data="filter_no_username")],
             [InlineKeyboardButton(text=f"📝 无头像过滤: {no_avatar}", callback_data="filter_no_avatar")],
             [InlineKeyboardButton(text=f"🚯 广告垃圾过滤: {ad_spam}", callback_data="filter_ad_spam")],
+            [InlineKeyboardButton(text=f"🚫 广告拦截词: {ad_block_count}个", callback_data="filter_ad_block_keywords")],
             [InlineKeyboardButton(text="🚫 黑名单管理", callback_data="menu_blacklist")],
             [InlineKeyboardButton(text="🔙 返回主菜单", callback_data="menu_main")]
         ]
@@ -2998,7 +3032,10 @@ class JTBot:
             await callback.answer()
             
             settings = self.filter_manager.settings
+            ad_block_keywords = self.filter_manager.get_ad_block_keywords()
+            preview = ' | '.join(ad_block_keywords[:6]) if ad_block_keywords else '未设置'
             text = "⚙️ 过滤设置\n\n"
+            text += f"广告拦截词: {preview}\n\n"
             text += "点击下方按钮修改设置："
             
             await callback.message.edit_text(
@@ -3023,6 +3060,50 @@ class JTBot:
             current = self.filter_manager.get_setting('filter_ad_spam')
             self.filter_manager.update_setting('filter_ad_spam', not current)
             await menu_filters(callback)
+
+        @self.dp.callback_query(F.data == "filter_ad_block_keywords")
+        async def set_ad_block_keywords(callback: CallbackQuery, state: FSMContext):
+            await callback.answer()
+
+            current_keywords = self.filter_manager.get_ad_block_keywords()
+            current_text = ' | '.join(current_keywords) if current_keywords else '未设置'
+            await callback.message.edit_text(
+                "🚫 设置广告拦截关键词\n\n"
+                "只要消息包含以下任一关键词，就直接不监听、不转发。\n"
+                "多个关键词用 | 分隔。\n"
+                "发送“清空”可清空自定义拦截词。\n\n"
+                f"当前: {current_text}\n\n"
+                "示例: 出|出售|卖|合作|代发",
+                reply_markup=Keyboards.back_to_main()
+            )
+            await state.set_state(BotStates.waiting_for_ad_block_keywords)
+
+        @self.dp.message(BotStates.waiting_for_ad_block_keywords)
+        async def receive_ad_block_keywords(message: Message, state: FSMContext):
+            if message.from_user.id != Config.ADMIN_USER_ID:
+                return
+
+            raw_text = (message.text or '').strip()
+            if not raw_text:
+                await message.answer("❌ 关键词不能为空")
+                return
+
+            if raw_text == '清空':
+                keywords = []
+            else:
+                keywords = [item.strip() for item in raw_text.split('|') if item.strip()]
+                if not keywords:
+                    await message.answer("❌ 请至少输入一个关键词")
+                    return
+
+            self.filter_manager.update_ad_block_keywords(keywords)
+            updated_keywords = self.filter_manager.get_ad_block_keywords()
+            keywords_text = ' | '.join(updated_keywords) if updated_keywords else '已清空'
+            await message.answer(
+                f"✅ 广告拦截关键词已更新\n\n当前: {keywords_text}",
+                reply_markup=Keyboards.filters_menu(self.filter_manager.settings)
+            )
+            await state.clear()
         
         @self.dp.callback_query(F.data == "filter_cooldown")
         async def set_cooldown(callback: CallbackQuery, state: FSMContext):
