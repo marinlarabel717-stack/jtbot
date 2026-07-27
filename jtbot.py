@@ -21,7 +21,7 @@ from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, BufferedInputFile, FSInputFile
+from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, FSInputFile
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -3388,15 +3388,23 @@ class JTBot:
                 filename = await self._export_data(records, format_type, filter_info)
                 
                 # 发送文件
-                with open(filename, 'rb') as f:
-                    file_data = f.read()
-                    file = BufferedInputFile(file_data, filename=os.path.basename(filename))
-                    
-                    caption = f"✅ 导出完成\n\n"
-                    caption += f"过滤条件: {filter_info}\n"
-                    caption += f"记录数: {len(records)}"
-                    
-                    await callback.message.answer_document(file, caption=caption)
+                file_size = os.path.getsize(filename)
+                if file_size > 49 * 1024 * 1024:
+                    raise ValueError(f"导出文件过大({file_size / 1024 / 1024:.1f}MB)，已超过 Telegram 机器人发送上限")
+
+                file = FSInputFile(filename)
+                caption = f"✅ 导出完成\n\n"
+                caption += f"过滤条件: {filter_info}\n"
+                caption += f"记录数: {len(records)}"
+
+                logger.info(
+                    f"开始发送导出文件: path={filename} size={file_size} format={format_type} records={len(records)}"
+                )
+                await callback.message.answer_document(
+                    file,
+                    caption=caption,
+                    request_timeout=180
+                )
                 
                 await callback.message.edit_text(
                     "✅ 导出成功！",
