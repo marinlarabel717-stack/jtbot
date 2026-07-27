@@ -462,6 +462,11 @@ class FilterManager:
 
         self.settings['ad_block_keywords'] = cleaned
         self.save_settings()
+
+    def append_ad_block_keywords(self, keywords: List[str]):
+        """Append custom ad block keywords while preserving existing ones."""
+        current_keywords = self.get_ad_block_keywords()
+        self.update_ad_block_keywords(current_keywords + keywords)
     
     def check_user_filter(self, user: User) -> Tuple[bool, str]:
         """
@@ -3071,6 +3076,7 @@ class JTBot:
                 "🚫 设置广告拦截关键词\n\n"
                 "只要消息包含以下任一关键词，就直接不监听、不转发。\n"
                 "多个关键词用 | 分隔。\n"
+                "不发“清空”的话，会保留已有关键词，新发的自动追加。\n"
                 "发送“清空”可清空自定义拦截词。\n\n"
                 f"当前: {current_text}\n\n"
                 "示例: 出|出售|卖|合作|代发",
@@ -3096,11 +3102,11 @@ class JTBot:
                     await message.answer("❌ 请至少输入一个关键词")
                     return
 
-            self.filter_manager.update_ad_block_keywords(keywords)
+            self.filter_manager.append_ad_block_keywords(keywords)
             updated_keywords = self.filter_manager.get_ad_block_keywords()
             keywords_text = ' | '.join(updated_keywords) if updated_keywords else '已清空'
             await message.answer(
-                f"✅ 广告拦截关键词已更新\n\n当前: {keywords_text}",
+                f"✅ 广告拦截关键词已追加更新\n\n当前: {keywords_text}",
                 reply_markup=Keyboards.filters_menu(self.filter_manager.settings)
             )
             await state.clear()
