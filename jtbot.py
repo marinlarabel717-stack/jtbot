@@ -403,6 +403,7 @@ class FilterManager:
             'max_message_length': 500,  # 消息长度限制（字符数）
             'filter_no_username': False,
             'filter_no_avatar': False,
+            'filter_non_premium': False,
             'min_account_age_days': 0,
             'filter_ad_spam': True,
             'ad_block_keywords': ['出', '出售', '卖']
@@ -480,6 +481,10 @@ class FilterManager:
         # 检查是否有头像
         if self.settings['filter_no_avatar'] and not user.photo:
             return False, '无头像'
+
+        # 检查是否为 Telegram Premium 会员
+        if self.settings.get('filter_non_premium') and not getattr(user, 'premium', False):
+            return False, '非会员账号'
         
         # 检查账号年龄（基于user_id估算）
         min_age_days = self.settings['min_account_age_days']
@@ -1776,6 +1781,7 @@ class Keyboards:
         min_age = settings.get('min_account_age_days', 7)
         no_username = '✅ 开启' if settings.get('filter_no_username', True) else '❌ 关闭'
         no_avatar = '✅ 开启' if settings.get('filter_no_avatar', False) else '❌ 关闭'
+        premium_only = '✅ 开启' if settings.get('filter_non_premium', False) else '❌ 关闭'
         ad_spam = '✅ 开启' if settings.get('filter_ad_spam', True) else '❌ 关闭'
         ad_block_keywords = settings.get('ad_block_keywords', [])
         ad_block_count = len(ad_block_keywords) if isinstance(ad_block_keywords, list) else 0
@@ -1786,6 +1792,7 @@ class Keyboards:
             [InlineKeyboardButton(text=f"📅 账号年龄: {min_age}天", callback_data="filter_min_age")],
             [InlineKeyboardButton(text=f"👤 无用户名过滤: {no_username}", callback_data="filter_no_username")],
             [InlineKeyboardButton(text=f"📝 无头像过滤: {no_avatar}", callback_data="filter_no_avatar")],
+            [InlineKeyboardButton(text=f"⭐ 仅会员转发: {premium_only}", callback_data="filter_non_premium")],
             [InlineKeyboardButton(text=f"🚯 广告垃圾过滤: {ad_spam}", callback_data="filter_ad_spam")],
             [InlineKeyboardButton(text=f"🚫 广告拦截词: {ad_block_count}个", callback_data="filter_ad_block_keywords")],
             [InlineKeyboardButton(text="🚫 黑名单管理", callback_data="menu_blacklist")],
@@ -3058,6 +3065,12 @@ class JTBot:
         async def toggle_no_avatar(callback: CallbackQuery):
             current = self.filter_manager.get_setting('filter_no_avatar')
             self.filter_manager.update_setting('filter_no_avatar', not current)
+            await menu_filters(callback)
+
+        @self.dp.callback_query(F.data == "filter_non_premium")
+        async def toggle_non_premium(callback: CallbackQuery):
+            current = self.filter_manager.get_setting('filter_non_premium')
+            self.filter_manager.update_setting('filter_non_premium', not current)
             await menu_filters(callback)
 
         @self.dp.callback_query(F.data == "filter_ad_spam")
@@ -6452,6 +6465,7 @@ class JTBot:
         text += f"🔗 群组链接: {chat_link}\n"
         text += f"👤 发送用户: {sender_name} ({sender_username})\n"
         text += f"🆔 用户ID: {sender.id}\n"
+        text += f"⭐ 会员状态: {'会员' if getattr(sender, 'premium', False) else '非会员'}\n"
         text += f"🔑 触发关键词: {keywords_text}\n"
         text += f"📱 监控账号: {monitor_phone}\n"
         text += f"⏰ 时间: {time_str}\n\n"

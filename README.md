@@ -6,7 +6,7 @@ JTBot is a Telegram multi-account keyword monitoring bot with an admin control p
 
 - Multi-account Telegram monitoring with Telethon sessions
 - Keyword management and keyword-triggered alert forwarding
-- User filtering by cooldown, message length, estimated account age, username, and avatar
+- User filtering by cooldown, message length, estimated account age, username, avatar, and Telegram Premium status
 - User/chat blacklist management
 - Export matched records by time range, keyword, or full CSV
 - DM account pool with session upload, status checks, and daily send limits
