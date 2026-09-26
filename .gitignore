@@ -15,10 +15,12 @@ env/
 
 # Runtime data
 jtbot.log
+jtbot.exe
 config/
 sessions/
 dm_sessions/
 exports/
+data/
 *.session
 *.session-journal
 *.csv
