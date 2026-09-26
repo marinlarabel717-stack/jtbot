@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -37,18 +38,39 @@ func TestPipelineQueuesAndSendsDM(t *testing.T) {
 	}))
 	defer server.Close()
 
-	recordStore, err := storage.NewRecordStore(filepath.Join(t.TempDir(), "records.json"))
+	tmpDir := t.TempDir()
+	recordStore, err := storage.NewRecordStore(filepath.Join(tmpDir, "records.json"))
 	if err != nil {
 		t.Fatalf("new record store: %v", err)
+	}
+
+	keywordPath := filepath.Join(tmpDir, "keywords.json")
+	if err := os.WriteFile(keywordPath, []byte("{\"keywords\":[\"合作\",\"私信\"]}"), 0o644); err != nil {
+		t.Fatalf("write keywords file: %v", err)
+	}
+	keywordStore := storage.NewKeywordStore(keywordPath)
+	if _, err := keywordStore.Load(); err != nil {
+		t.Fatalf("load keywords: %v", err)
+	}
+
+	settingsStore, err := storage.NewSettingsStore(filepath.Join(tmpDir, "settings.json"), storage.RuntimeSettings{
+		MonitoringEnabled: true,
+		MonitorChatIDs:    []int64{-100123},
+		CooldownMinutes:   60,
+		DMTemplate:        "你好，看到你提到 {keywords}",
+		DryRun:            false,
+	})
+	if err != nil {
+		t.Fatalf("new settings store: %v", err)
 	}
 
 	logger := logx.New("debug")
 	client := tg.NewClientWithBaseURL(server.URL)
 	jobQueue := queue.NewMessageQueue(8)
-	m := matcher.NewKeywordMatcher([]string{"合作", "私信"})
-	ruleEngine := rules.NewEngine(map[int64]struct{}{-100123: {}}, time.Hour, recordStore)
-	dmSender := sender.New(client, recordStore, "你好，看到你提到 {keywords}", false, logger)
-	svc := NewTriggerService(m, ruleEngine, jobQueue, recordStore, client, 0, logger)
+	m := matcher.NewKeywordMatcher()
+	ruleEngine := rules.NewEngine(settingsStore, recordStore)
+	dmSender := sender.New(client, recordStore, settingsStore, logger)
+	svc := NewTriggerService(m, keywordStore, ruleEngine, jobQueue, recordStore, client, settingsStore, logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -56,7 +78,7 @@ func TestPipelineQueuesAndSendsDM(t *testing.T) {
 
 	err = svc.HandleUpdate(ctx, model.Update{
 		UpdateID: 1,
-		Message: model.Message{
+		Message: &model.Message{
 			MessageID: 99,
 			From: &model.User{
 				ID:       777,
@@ -64,7 +86,7 @@ func TestPipelineQueuesAndSendsDM(t *testing.T) {
 			},
 			Chat: model.Chat{
 				ID:    -100123,
-				Title: "测试群",
+				Title: "test-group",
 			},
 			Text: "我想合作，欢迎私信我",
 		},

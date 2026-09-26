@@ -3,8 +3,9 @@ package model
 import "time"
 
 type Update struct {
-	UpdateID int     `json:"update_id"`
-	Message  Message `json:"message"`
+	UpdateID      int            `json:"update_id"`
+	Message       *Message       `json:"message,omitempty"`
+	CallbackQuery *CallbackQuery `json:"callback_query,omitempty"`
 }
 
 type Message struct {
@@ -44,6 +45,22 @@ type Entity struct {
 	Type   string `json:"type"`
 	Offset int    `json:"offset"`
 	Length int    `json:"length"`
+}
+
+type CallbackQuery struct {
+	ID      string   `json:"id"`
+	From    *User    `json:"from"`
+	Message *Message `json:"message,omitempty"`
+	Data    string   `json:"data"`
+}
+
+type InlineKeyboardMarkup struct {
+	InlineKeyboard [][]InlineKeyboardButton `json:"inline_keyboard"`
+}
+
+type InlineKeyboardButton struct {
+	Text         string `json:"text"`
+	CallbackData string `json:"callback_data,omitempty"`
 }
 
 type MatchRecord struct {

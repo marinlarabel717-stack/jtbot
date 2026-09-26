@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/marinlarabel717-stack/jtbot/internal/config"
 	"github.com/marinlarabel717-stack/jtbot/internal/listener"
@@ -52,13 +53,27 @@ func New() (*App, error) {
 		return nil, err
 	}
 
+	settingsStore, err := storage.NewSettingsStore(cfg.SettingsFile, storage.RuntimeSettings{
+		MonitoringEnabled: true,
+		MonitorChatIDs:    mapKeys(cfg.MonitorChatIDs),
+		AlertChatID:       cfg.AlertChatID,
+		CooldownMinutes:   int(cfg.Cooldown / time.Minute),
+		DMTemplate:        cfg.DMTemplate,
+		DryRun:            cfg.DryRun,
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	client := tg.NewClient(cfg.BotToken)
 	jobQueue := queue.NewMessageQueue(cfg.QueueSize)
-	m := matcher.NewKeywordMatcher(keywords)
-	ruleEngine := rules.NewEngine(cfg.MonitorChatIDs, cfg.Cooldown, recordStore)
-	dmSender := sender.New(client, recordStore, cfg.DMTemplate, cfg.DryRun, logger)
-	svc := service.NewTriggerService(m, ruleEngine, jobQueue, recordStore, client, cfg.AlertChatID, logger)
-	poller := listener.NewPoller(client, cfg.PollTimeout, logger, svc.HandleUpdate)
+	m := matcher.NewKeywordMatcher()
+	ruleEngine := rules.NewEngine(settingsStore, recordStore)
+	dmSender := sender.New(client, recordStore, settingsStore, logger)
+	triggerSvc := service.NewTriggerService(m, keywordStore, ruleEngine, jobQueue, recordStore, client, settingsStore, logger)
+	adminSvc := service.NewAdminService(cfg.AdminUserID, client, keywordStore, settingsStore, logger)
+	router := service.NewRouter(adminSvc, triggerSvc)
+	poller := listener.NewPoller(client, cfg.PollTimeout, logger, router.HandleUpdate)
 
 	return &App{
 		cfg:    cfg,
@@ -70,7 +85,15 @@ func New() (*App, error) {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	a.logger.Infof("jtbot go first version started")
+	a.logger.Infof("jtbot go admin version started")
 	go a.sender.Run(ctx, a.queue.Consume())
 	return a.poller.Run(ctx)
+}
+
+func mapKeys(input map[int64]struct{}) []int64 {
+	result := make([]int64, 0, len(input))
+	for id := range input {
+		result = append(result, id)
+	}
+	return result
 }

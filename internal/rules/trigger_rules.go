@@ -9,28 +9,30 @@ import (
 )
 
 type Engine struct {
-	monitorChatIDs map[int64]struct{}
-	cooldown       time.Duration
-	recordStore    *storage.RecordStore
+	settings    *storage.SettingsStore
+	recordStore *storage.RecordStore
 
 	mu            sync.Mutex
 	processedMsgs map[string]time.Time
 }
 
-func NewEngine(monitorChatIDs map[int64]struct{}, cooldown time.Duration, recordStore *storage.RecordStore) *Engine {
+func NewEngine(settings *storage.SettingsStore, recordStore *storage.RecordStore) *Engine {
 	return &Engine{
-		monitorChatIDs: monitorChatIDs,
-		cooldown:       cooldown,
-		recordStore:    recordStore,
-		processedMsgs:  make(map[string]time.Time),
+		settings:      settings,
+		recordStore:   recordStore,
+		processedMsgs: make(map[string]time.Time),
 	}
 }
 
 func (e *Engine) AllowChat(chatID int64) bool {
-	if len(e.monitorChatIDs) == 0 {
+	if !e.settings.IsMonitoringEnabled() {
+		return false
+	}
+	monitorChatIDs := e.settings.MonitorChatIDSet()
+	if len(monitorChatIDs) == 0 {
 		return true
 	}
-	_, ok := e.monitorChatIDs[chatID]
+	_, ok := monitorChatIDs[chatID]
 	return ok
 }
 
@@ -56,5 +58,5 @@ func (e *Engine) MarkProcessed(chatID, messageID int64) bool {
 }
 
 func (e *Engine) CanQueueDM(userID int64) bool {
-	return !e.recordStore.IsUserInCooldown(userID, e.cooldown)
+	return !e.recordStore.IsUserInCooldown(userID, e.settings.Cooldown())
 }

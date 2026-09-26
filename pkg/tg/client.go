@@ -53,10 +53,13 @@ func (c *Client) GetUpdates(ctx context.Context, offset, timeout int) ([]model.U
 	return response.Result, nil
 }
 
-func (c *Client) SendMessage(ctx context.Context, chatID int64, text string) error {
+func (c *Client) SendMessage(ctx context.Context, chatID int64, text string, replyMarkup *model.InlineKeyboardMarkup) error {
 	payload := map[string]any{
 		"chat_id": chatID,
 		"text":    text,
+	}
+	if replyMarkup != nil {
+		payload["reply_markup"] = replyMarkup
 	}
 
 	var response apiResponse[map[string]any]
@@ -65,6 +68,42 @@ func (c *Client) SendMessage(ctx context.Context, chatID int64, text string) err
 	}
 	if !response.OK {
 		return fmt.Errorf("telegram sendMessage failed: %s", response.Description)
+	}
+	return nil
+}
+
+func (c *Client) EditMessageText(ctx context.Context, chatID int64, messageID int64, text string, replyMarkup *model.InlineKeyboardMarkup) error {
+	payload := map[string]any{
+		"chat_id":    chatID,
+		"message_id": messageID,
+		"text":       text,
+	}
+	if replyMarkup != nil {
+		payload["reply_markup"] = replyMarkup
+	}
+
+	var response apiResponse[map[string]any]
+	if err := c.doJSONRequest(ctx, http.MethodPost, "editMessageText", payload, &response); err != nil {
+		return err
+	}
+	if !response.OK {
+		return fmt.Errorf("telegram editMessageText failed: %s", response.Description)
+	}
+	return nil
+}
+
+func (c *Client) AnswerCallbackQuery(ctx context.Context, callbackQueryID, text string) error {
+	payload := map[string]any{
+		"callback_query_id": callbackQueryID,
+		"text":              text,
+	}
+
+	var response apiResponse[bool]
+	if err := c.doJSONRequest(ctx, http.MethodPost, "answerCallbackQuery", payload, &response); err != nil {
+		return err
+	}
+	if !response.OK {
+		return fmt.Errorf("telegram answerCallbackQuery failed: %s", response.Description)
 	}
 	return nil
 }

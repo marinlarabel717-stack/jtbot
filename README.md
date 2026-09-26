@@ -1,21 +1,23 @@
 # jtbot
 
-JTBot is a Telegram multi-account keyword monitoring bot with an admin control panel and a DM account pool.
+JTBot is a Telegram keyword monitoring bot. The repository still contains the older Python implementation, and now also includes a Go version that focuses on a clean, maintainable core pipeline.
 
-## Go First Version
+## Go Version
 
-This repository now also contains a Go first version focused on the core end-to-end flow:
+The current Go version provides:
 
-- listen to group messages with Telegram Bot API long polling
-- match configured keywords
-- store match records
-- apply user cooldown
-- enqueue DM jobs
-- send direct messages to matched users
+- Telegram Bot API long polling
+- keyword matching
+- match record persistence
+- cooldown-based repeat protection
+- DM queue and sender worker
+- inline-button admin panel inside the bot chat
 
-Current Go scope is intentionally small and stable-first. It does not yet replace the original Python Telethon multi-session account pool. The first version is meant to get the main pipeline running cleanly in Go.
+Current Go limitation:
 
-### Go Structure
+- it uses Telegram Bot API, so direct messages only work if the target user has already opened a chat with the bot
+
+## Go Structure
 
 ```text
 cmd/jtbot/main.go
@@ -33,43 +35,37 @@ internal/storage
 pkg/tg
 ```
 
-### Go Run
+## Go Run
 
 1. Copy `.env.example` to `.env`
-2. Fill in `BOT_TOKEN`, `MONITOR_CHAT_IDS`, and optionally `ALERT_CHAT_ID`
-3. Adjust `configs/keywords.example.json`
-4. Run `go run ./cmd/jtbot`
+2. Fill in `BOT_TOKEN` and `ADMIN_USER_ID`
+3. Optionally fill in `MONITOR_CHAT_IDS` and `ALERT_CHAT_ID`
+4. Adjust `configs/keywords.example.json`
+5. Run `go run ./cmd/jtbot`
+6. Open a private chat with the bot and send `/start`
 
-### Important Limitation
+## Go Admin Panel
 
-The Go first version uses Telegram Bot API, so direct messages only work if the target user has already started the bot or otherwise opened a chat with it before. The older Python project uses user-account sessions, which is why its DM capability is broader.
+The inline-button admin panel currently supports:
 
-## Features
+- view running status
+- add keywords
+- remove keywords
+- enable or disable monitoring
+- toggle dry-run mode
+- change cooldown minutes
+- change the DM template
+- add monitored chat IDs
+- remove monitored chat IDs
+- set the current chat as the alert chat
 
-- Multi-account Telegram monitoring with Telethon sessions
-- Keyword management and keyword-triggered alert forwarding
-- User filtering by cooldown, message length, estimated account age, username, avatar, and Telegram Premium status
-- User/chat blacklist management
-- Export matched records by time range, keyword, or full CSV
-- DM account pool with session upload, status checks, and daily send limits
-- DM templates for plain text, PostBot inline content, channel forwarding, and hidden-source forwarding
-- Optional sticker-first greeting flow and DM send records
+## Python Files
 
-## Files
-
-- `jtbot.py`: main bot program
+- `jtbot.py`: original Python bot
 - `requirements.txt`: Python dependencies
 - `proxy.txt`: optional proxy configuration
-- `.env.example`: environment variable template
-
-## Quick Start
-
-1. Create a virtual environment.
-2. Install dependencies from `requirements.txt`.
-3. Copy `.env.example` to `.env` and fill in your values.
-4. Run `python jtbot.py`.
 
 ## Notes
 
-- This public repository does not include the real `.env` file.
-- Runtime data such as sessions, exports, logs, and generated config files are git-ignored.
+- runtime data such as `.env`, `data/`, session files, and exports are git-ignored
+- the Go and Python implementations currently coexist in the same repository, but the new work is being pushed into the Go path

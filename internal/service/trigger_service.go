@@ -16,38 +16,41 @@ import (
 )
 
 type TriggerService struct {
-	matcher     *matcher.KeywordMatcher
-	rules       *rules.Engine
-	queue       *queue.MessageQueue
-	recordStore *storage.RecordStore
-	client      *tg.Client
-	alertChatID int64
-	logger      *logx.Logger
+	matcher      *matcher.KeywordMatcher
+	keywordStore *storage.KeywordStore
+	rules        *rules.Engine
+	queue        *queue.MessageQueue
+	recordStore  *storage.RecordStore
+	client       *tg.Client
+	settings     *storage.SettingsStore
+	logger       *logx.Logger
 }
 
 func NewTriggerService(
 	matcher *matcher.KeywordMatcher,
+	keywordStore *storage.KeywordStore,
 	rules *rules.Engine,
 	queue *queue.MessageQueue,
 	recordStore *storage.RecordStore,
 	client *tg.Client,
-	alertChatID int64,
+	settings *storage.SettingsStore,
 	logger *logx.Logger,
 ) *TriggerService {
 	return &TriggerService{
-		matcher:     matcher,
-		rules:       rules,
-		queue:       queue,
-		recordStore: recordStore,
-		client:      client,
-		alertChatID: alertChatID,
-		logger:      logger,
+		matcher:      matcher,
+		keywordStore: keywordStore,
+		rules:        rules,
+		queue:        queue,
+		recordStore:  recordStore,
+		client:       client,
+		settings:     settings,
+		logger:       logger,
 	}
 }
 
 func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) error {
 	msg := update.Message
-	if msg.MessageID == 0 || msg.From == nil || msg.From.IsBot {
+	if msg == nil || msg.MessageID == 0 || msg.From == nil || msg.From.IsBot {
 		return nil
 	}
 
@@ -64,7 +67,7 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 		return nil
 	}
 
-	keywords := s.matcher.Match(content)
+	keywords := s.matcher.Match(content, s.keywordStore.List())
 	if len(keywords) == 0 {
 		return nil
 	}
@@ -93,7 +96,7 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 
 	s.logger.Infof("matched user=%d chat=%d keywords=%s", msg.From.ID, msg.Chat.ID, strings.Join(keywords, ","))
 
-	if s.alertChatID != 0 {
+	if alertChatID := s.settings.AlertChatID(); alertChatID != 0 {
 		alertText := fmt.Sprintf(
 			"关键词命中\n群: %s\n用户: @%s (%d)\n关键词: %s\n消息: %s",
 			chatTitle,
@@ -102,7 +105,7 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 			strings.Join(keywords, ", "),
 			content,
 		)
-		if err := s.client.SendMessage(ctx, s.alertChatID, alertText); err != nil {
+		if err := s.client.SendMessage(ctx, alertChatID, alertText, nil); err != nil {
 			s.logger.Errorf("send alert failed: %v", err)
 		}
 	}
