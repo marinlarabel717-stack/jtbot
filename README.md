@@ -1,21 +1,23 @@
 # jtbot
 
-JTBot is a Telegram keyword monitoring bot built in Go, with a clean, maintainable core pipeline and an inline-button admin panel.
+JTBot is a Telegram keyword monitoring tool built in Go for Telegram user accounts. It logs in with a real account session, listens to the groups that account has already joined, matches keywords, and can DM matched users.
 
 ## Features
 
 The current version provides:
 
-- Telegram Bot API long polling
+- Telegram user session login via MTProto
+- listening to group and supergroup messages seen by that account
 - keyword matching
 - match record persistence
 - cooldown-based repeat protection
 - DM queue and sender worker
-- inline-button admin panel inside the bot chat
+- JSON-based runtime settings for monitored chat IDs and template
 
 Current limitation:
 
-- it uses Telegram Bot API, so direct messages only work if the target user has already opened a chat with the bot
+- first login requires interactive code entry in the terminal
+- monitored channels/groups must already be joined by the account session
 
 ## Project Structure
 
@@ -38,28 +40,15 @@ pkg/tg
 ## Run
 
 1. Copy `.env.example` to `.env`
-2. Fill in `BOT_TOKEN` and `ADMIN_USER_ID`
+2. Fill in `APP_ID`, `APP_HASH`, and `PHONE`
 3. Optionally fill in `MONITOR_CHAT_IDS` and `ALERT_CHAT_ID`
 4. Adjust `configs/keywords.example.json`
 5. Run `go run ./cmd/jtbot`
-6. Open a private chat with the bot and send `/start`
-
-## Admin Panel
-
-The inline-button admin panel currently supports:
-
-- view running status
-- add keywords
-- remove keywords
-- enable or disable monitoring
-- toggle dry-run mode
-- change cooldown minutes
-- change the DM template
-- add monitored chat IDs
-- remove monitored chat IDs
-- set the current chat as the alert chat
+6. Enter the Telegram login code the first time the session is created
+7. Keep the account in the groups you want to monitor
 
 ## Notes
 
-- runtime data such as `.env`, `data/`, session files, and exports are git-ignored
+- runtime data such as `.env`, `data/`, and session files are git-ignored
 - deploy the bot with `go run ./cmd/jtbot` or a binary built from `./cmd/jtbot`
+- this version is designed for user-account monitoring, not Bot API group bots

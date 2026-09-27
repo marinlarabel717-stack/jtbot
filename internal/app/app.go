@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/marinlarabel717-stack/jtbot/internal/config"
-	"github.com/marinlarabel717-stack/jtbot/internal/listener"
 	"github.com/marinlarabel717-stack/jtbot/internal/logx"
 	"github.com/marinlarabel717-stack/jtbot/internal/matcher"
 	"github.com/marinlarabel717-stack/jtbot/internal/queue"
@@ -20,11 +19,12 @@ import (
 )
 
 type App struct {
-	cfg    config.Config
-	logger *logx.Logger
-	poller *listener.Poller
-	sender *sender.Sender
-	queue  *queue.MessageQueue
+	cfg     config.Config
+	logger  *logx.Logger
+	client  *tg.Client
+	trigger *service.TriggerService
+	sender  *sender.Sender
+	queue   *queue.MessageQueue
 }
 
 func New() (*App, error) {
@@ -65,29 +65,27 @@ func New() (*App, error) {
 		return nil, err
 	}
 
-	client := tg.NewClient(cfg.BotToken)
+	client := tg.NewClient(cfg.AppID, cfg.AppHash, cfg.Phone, cfg.SessionFile, logger)
 	jobQueue := queue.NewMessageQueue(cfg.QueueSize)
 	m := matcher.NewKeywordMatcher()
 	ruleEngine := rules.NewEngine(settingsStore, recordStore)
 	dmSender := sender.New(client, recordStore, settingsStore, logger)
 	triggerSvc := service.NewTriggerService(m, keywordStore, ruleEngine, jobQueue, recordStore, client, settingsStore, logger)
-	adminSvc := service.NewAdminService(cfg.AdminUserID, client, keywordStore, settingsStore, logger)
-	router := service.NewRouter(adminSvc, triggerSvc)
-	poller := listener.NewPoller(client, cfg.PollTimeout, logger, router.HandleUpdate)
 
 	return &App{
-		cfg:    cfg,
-		logger: logger,
-		poller: poller,
-		sender: dmSender,
-		queue:  jobQueue,
+		cfg:     cfg,
+		logger:  logger,
+		client:  client,
+		trigger: triggerSvc,
+		sender:  dmSender,
+		queue:   jobQueue,
 	}, nil
 }
 
 func (a *App) Run(ctx context.Context) error {
-	a.logger.Infof("jtbot go admin version started")
+	a.logger.Infof("jtbot user session version started")
 	go a.sender.Run(ctx, a.queue.Consume())
-	return a.poller.Run(ctx)
+	return a.client.Run(ctx, a.trigger.HandleUpdate)
 }
 
 func mapKeys(input map[int64]struct{}) []int64 {

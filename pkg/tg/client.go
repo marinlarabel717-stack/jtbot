@@ -3,19 +3,412 @@ package tg
 import (
 	"bytes"
 	"context"
+	crand "crypto/rand"
+	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
+	"sync"
 
+	"github.com/gotd/td/examples"
+	"github.com/gotd/td/telegram"
+	"github.com/gotd/td/telegram/auth"
+	"github.com/gotd/td/telegram/updates"
+	updhook "github.com/gotd/td/telegram/updates/hook"
+	mtproto "github.com/gotd/td/tg"
+
+	"github.com/marinlarabel717-stack/jtbot/internal/logx"
 	"github.com/marinlarabel717-stack/jtbot/internal/model"
 )
 
 type Client struct {
-	baseURL    string
-	httpClient *http.Client
+	appID       int
+	appHash     string
+	phone       string
+	sessionFile string
+	logger      *logx.Logger
+	baseURL     string
+	httpClient  *http.Client
+
+	mu     sync.RWMutex
+	api    *mtproto.Client
+	selfID int64
+	peers  map[int64]mtproto.InputPeerClass
+}
+
+func NewClient(appID int, appHash, phone, sessionFile string, logger *logx.Logger) *Client {
+	return &Client{
+		appID:       appID,
+		appHash:     appHash,
+		phone:       phone,
+		sessionFile: sessionFile,
+		logger:      logger,
+		peers:       make(map[int64]mtproto.InputPeerClass),
+	}
+}
+
+func NewClientWithBaseURL(baseURL string) *Client {
+	if baseURL != "" && !strings.HasSuffix(baseURL, "/") {
+		baseURL += "/"
+	}
+	return &Client{
+		baseURL:    baseURL,
+		httpClient: &http.Client{},
+		peers:      make(map[int64]mtproto.InputPeerClass),
+	}
+}
+
+func (c *Client) Run(ctx context.Context, handler func(context.Context, model.Update) error) error {
+	dispatcher := mtproto.NewUpdateDispatcher()
+	gaps := updates.New(updates.Config{
+		Handler: dispatcher,
+	})
+
+	dispatcher.OnNewMessage(func(ctx context.Context, entities mtproto.Entities, update *mtproto.UpdateNewMessage) error {
+		return c.handleIncomingMessage(ctx, entities, update.Message, handler)
+	})
+	dispatcher.OnNewChannelMessage(func(ctx context.Context, entities mtproto.Entities, update *mtproto.UpdateNewChannelMessage) error {
+		return c.handleIncomingMessage(ctx, entities, update.Message, handler)
+	})
+
+	if err := os.MkdirAll(filepath.Dir(c.sessionFile), 0o755); err != nil {
+		return fmt.Errorf("create session dir: %w", err)
+	}
+
+	sessionStorage := &telegram.FileSessionStorage{Path: c.sessionFile}
+	client := telegram.NewClient(c.appID, c.appHash, telegram.Options{
+		SessionStorage: sessionStorage,
+		UpdateHandler:  gaps,
+		Middlewares: []telegram.Middleware{
+			updhook.UpdateHook(gaps.Handle),
+			updhook.AffectedHook(gaps),
+		},
+	})
+
+	flow := auth.NewFlow(examples.Terminal{PhoneNumber: c.phone}, auth.SendCodeOptions{})
+
+	return client.Run(ctx, func(ctx context.Context) error {
+		if err := client.Auth().IfNecessary(ctx, flow); err != nil {
+			return fmt.Errorf("auth: %w", err)
+		}
+
+		self, err := client.Self(ctx)
+		if err != nil {
+			return fmt.Errorf("get self: %w", err)
+		}
+
+		api := client.API()
+
+		c.mu.Lock()
+		c.api = api
+		c.selfID = self.ID
+		c.peers[self.ID] = &mtproto.InputPeerSelf{}
+		c.mu.Unlock()
+
+		c.logger.Infof("authorized account id=%d phone=%s", self.ID, c.phone)
+
+		return gaps.Run(ctx, api, self.ID, updates.AuthOptions{
+			OnStart: func(context.Context) {
+				c.logger.Infof("mtproto updates listener started")
+			},
+		})
+	})
+}
+
+func (c *Client) GetUpdates(ctx context.Context, offset, timeout int) ([]model.Update, error) {
+	if c.baseURL != "" {
+		query := url.Values{}
+		query.Set("offset", strconv.Itoa(offset))
+		query.Set("timeout", strconv.Itoa(timeout))
+
+		var response apiResponse[[]model.Update]
+		if err := c.doJSONRequest(ctx, http.MethodGet, "getUpdates?"+query.Encode(), nil, &response); err != nil {
+			return nil, err
+		}
+		if !response.OK {
+			return nil, fmt.Errorf("compat getUpdates failed: %s", response.Description)
+		}
+		return response.Result, nil
+	}
+	return nil, errors.New("getUpdates is not supported in user-session mode")
+}
+
+func (c *Client) SendMessage(ctx context.Context, chatID int64, text string, replyMarkup *model.InlineKeyboardMarkup) error {
+	if c.baseURL != "" {
+		payload := map[string]any{
+			"chat_id": chatID,
+			"text":    text,
+		}
+		if replyMarkup != nil {
+			payload["reply_markup"] = replyMarkup
+		}
+		var response apiResponse[map[string]any]
+		if err := c.doJSONRequest(ctx, http.MethodPost, "sendMessage", payload, &response); err != nil {
+			return err
+		}
+		if !response.OK {
+			return fmt.Errorf("compat sendMessage failed: %s", response.Description)
+		}
+		return nil
+	}
+
+	if replyMarkup != nil {
+		return errors.New("reply markup is not supported in user-session mode")
+	}
+
+	peer, err := c.lookupPeer(chatID)
+	if err != nil {
+		return err
+	}
+
+	return c.sendText(ctx, peer, text)
+}
+
+func (c *Client) EditMessageText(ctx context.Context, chatID int64, messageID int64, text string, replyMarkup *model.InlineKeyboardMarkup) error {
+	if c.baseURL != "" {
+		payload := map[string]any{
+			"chat_id":    chatID,
+			"message_id": messageID,
+			"text":       text,
+		}
+		if replyMarkup != nil {
+			payload["reply_markup"] = replyMarkup
+		}
+		var response apiResponse[map[string]any]
+		if err := c.doJSONRequest(ctx, http.MethodPost, "editMessageText", payload, &response); err != nil {
+			return err
+		}
+		if !response.OK {
+			return fmt.Errorf("compat editMessageText failed: %s", response.Description)
+		}
+		return nil
+	}
+	return errors.New("editMessageText is not supported in user-session mode")
+}
+
+func (c *Client) AnswerCallbackQuery(ctx context.Context, callbackQueryID, text string) error {
+	if c.baseURL != "" {
+		payload := map[string]any{
+			"callback_query_id": callbackQueryID,
+			"text":              text,
+		}
+		var response apiResponse[bool]
+		if err := c.doJSONRequest(ctx, http.MethodPost, "answerCallbackQuery", payload, &response); err != nil {
+			return err
+		}
+		if !response.OK {
+			return fmt.Errorf("compat answerCallbackQuery failed: %s", response.Description)
+		}
+		return nil
+	}
+	return errors.New("callback queries are not supported in user-session mode")
+}
+
+func (c *Client) handleIncomingMessage(
+	ctx context.Context,
+	entities mtproto.Entities,
+	message mtproto.MessageClass,
+	handler func(context.Context, model.Update) error,
+) error {
+	msg, ok := message.(*mtproto.Message)
+	if !ok || msg == nil || msg.Out {
+		return nil
+	}
+
+	c.cacheEntities(entities)
+
+	converted, ok := c.convertMessage(msg, entities)
+	if !ok {
+		return nil
+	}
+
+	return handler(ctx, model.Update{
+		UpdateID: msg.ID,
+		Message:  &converted,
+	})
+}
+
+func (c *Client) convertMessage(msg *mtproto.Message, entities mtproto.Entities) (model.Message, bool) {
+	fromUser := c.resolveUser(msg, entities)
+	chat := c.resolveChat(msg.PeerID, entities)
+
+	return model.Message{
+		MessageID: int64(msg.ID),
+		From:      fromUser,
+		Chat:      chat,
+		Text:      strings.TrimSpace(msg.Message),
+		Date:      int64(msg.Date),
+	}, true
+}
+
+func (c *Client) resolveUser(msg *mtproto.Message, entities mtproto.Entities) *model.User {
+	if fromID, ok := msg.GetFromID(); ok {
+		if peer, ok := fromID.(*mtproto.PeerUser); ok {
+			if user, exists := entities.Users[peer.UserID]; exists {
+				return mapTelegramUser(user)
+			}
+		}
+	}
+
+	if peer, ok := msg.PeerID.(*mtproto.PeerUser); ok {
+		if user, exists := entities.Users[peer.UserID]; exists {
+			return mapTelegramUser(user)
+		}
+	}
+
+	return nil
+}
+
+func (c *Client) resolveChat(peer mtproto.PeerClass, entities mtproto.Entities) model.Chat {
+	switch p := peer.(type) {
+	case *mtproto.PeerChat:
+		if chat, exists := entities.Chats[p.ChatID]; exists {
+			return model.Chat{
+				ID:    p.ChatID,
+				Type:  "group",
+				Title: chat.Title,
+			}
+		}
+		return model.Chat{ID: p.ChatID, Type: "group"}
+	case *mtproto.PeerChannel:
+		if channel, exists := entities.Channels[p.ChannelID]; exists {
+			return model.Chat{
+				ID:    p.ChannelID,
+				Type:  "channel",
+				Title: channel.Title,
+			}
+		}
+		return model.Chat{ID: p.ChannelID, Type: "channel"}
+	case *mtproto.PeerUser:
+		if user, exists := entities.Users[p.UserID]; exists {
+			mapped := mapTelegramUser(user)
+			title := strings.TrimSpace(strings.Join([]string{mapped.FirstName, mapped.LastName}, " "))
+			if title == "" {
+				title = mapped.Username
+			}
+			return model.Chat{
+				ID:       p.UserID,
+				Type:     "private",
+				Title:    title,
+				Username: mapped.Username,
+			}
+		}
+		return model.Chat{ID: p.UserID, Type: "private"}
+	default:
+		return model.Chat{}
+	}
+}
+
+func (c *Client) cacheEntities(entities mtproto.Entities) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, user := range entities.Users {
+		if user == nil {
+			continue
+		}
+		accessHash, ok := user.GetAccessHash()
+		if !ok {
+			continue
+		}
+		c.peers[user.ID] = &mtproto.InputPeerUser{
+			UserID:     user.ID,
+			AccessHash: accessHash,
+		}
+	}
+
+	for _, chat := range entities.Chats {
+		if chat == nil {
+			continue
+		}
+		c.peers[chat.ID] = &mtproto.InputPeerChat{ChatID: chat.ID}
+	}
+
+	for _, channel := range entities.Channels {
+		if channel == nil {
+			continue
+		}
+		accessHash, ok := channel.GetAccessHash()
+		if !ok {
+			continue
+		}
+		c.peers[channel.ID] = &mtproto.InputPeerChannel{
+			ChannelID:  channel.ID,
+			AccessHash: accessHash,
+		}
+	}
+}
+
+func (c *Client) lookupPeer(id int64) (mtproto.InputPeerClass, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if id == c.selfID {
+		return &mtproto.InputPeerSelf{}, nil
+	}
+
+	peer, ok := c.peers[id]
+	if !ok {
+		return nil, fmt.Errorf("peer %d not cached yet; wait until this account sees that user/chat in updates", id)
+	}
+	return peer, nil
+}
+
+func (c *Client) sendText(ctx context.Context, peer mtproto.InputPeerClass, text string) error {
+	c.mu.RLock()
+	api := c.api
+	c.mu.RUnlock()
+
+	if api == nil {
+		return errors.New("telegram api is not ready")
+	}
+
+	randomID, err := randomInt64()
+	if err != nil {
+		return err
+	}
+
+	_, err = api.MessagesSendMessage(ctx, &mtproto.MessagesSendMessageRequest{
+		Peer:     peer,
+		Message:  text,
+		RandomID: randomID,
+	})
+	return err
+}
+
+func mapTelegramUser(user *mtproto.User) *model.User {
+	if user == nil {
+		return nil
+	}
+
+	username, _ := user.GetUsername()
+	firstName, _ := user.GetFirstName()
+	lastName, _ := user.GetLastName()
+	langCode, _ := user.GetLangCode()
+
+	return &model.User{
+		ID:           user.ID,
+		IsBot:        user.Bot,
+		FirstName:    firstName,
+		LastName:     lastName,
+		Username:     username,
+		LanguageCode: langCode,
+	}
+}
+
+func randomInt64() (int64, error) {
+	var buf [8]byte
+	if _, err := crand.Read(buf[:]); err != nil {
+		return 0, fmt.Errorf("generate random id: %w", err)
+	}
+	return int64(binary.LittleEndian.Uint64(buf[:])), nil
 }
 
 type apiResponse[T any] struct {
@@ -24,91 +417,11 @@ type apiResponse[T any] struct {
 	Description string `json:"description"`
 }
 
-func NewClient(token string) *Client {
-	return NewClientWithBaseURL("https://api.telegram.org/bot" + token + "/")
-}
-
-func NewClientWithBaseURL(baseURL string) *Client {
-	if baseURL != "" && baseURL[len(baseURL)-1] != '/' {
-		baseURL += "/"
-	}
-	return &Client{
-		baseURL:    baseURL,
-		httpClient: &http.Client{},
-	}
-}
-
-func (c *Client) GetUpdates(ctx context.Context, offset, timeout int) ([]model.Update, error) {
-	query := url.Values{}
-	query.Set("offset", strconv.Itoa(offset))
-	query.Set("timeout", strconv.Itoa(timeout))
-
-	var response apiResponse[[]model.Update]
-	if err := c.doJSONRequest(ctx, http.MethodGet, "getUpdates?"+query.Encode(), nil, &response); err != nil {
-		return nil, err
-	}
-	if !response.OK {
-		return nil, fmt.Errorf("telegram getUpdates failed: %s", response.Description)
-	}
-	return response.Result, nil
-}
-
-func (c *Client) SendMessage(ctx context.Context, chatID int64, text string, replyMarkup *model.InlineKeyboardMarkup) error {
-	payload := map[string]any{
-		"chat_id": chatID,
-		"text":    text,
-	}
-	if replyMarkup != nil {
-		payload["reply_markup"] = replyMarkup
-	}
-
-	var response apiResponse[map[string]any]
-	if err := c.doJSONRequest(ctx, http.MethodPost, "sendMessage", payload, &response); err != nil {
-		return err
-	}
-	if !response.OK {
-		return fmt.Errorf("telegram sendMessage failed: %s", response.Description)
-	}
-	return nil
-}
-
-func (c *Client) EditMessageText(ctx context.Context, chatID int64, messageID int64, text string, replyMarkup *model.InlineKeyboardMarkup) error {
-	payload := map[string]any{
-		"chat_id":    chatID,
-		"message_id": messageID,
-		"text":       text,
-	}
-	if replyMarkup != nil {
-		payload["reply_markup"] = replyMarkup
-	}
-
-	var response apiResponse[map[string]any]
-	if err := c.doJSONRequest(ctx, http.MethodPost, "editMessageText", payload, &response); err != nil {
-		return err
-	}
-	if !response.OK {
-		return fmt.Errorf("telegram editMessageText failed: %s", response.Description)
-	}
-	return nil
-}
-
-func (c *Client) AnswerCallbackQuery(ctx context.Context, callbackQueryID, text string) error {
-	payload := map[string]any{
-		"callback_query_id": callbackQueryID,
-		"text":              text,
-	}
-
-	var response apiResponse[bool]
-	if err := c.doJSONRequest(ctx, http.MethodPost, "answerCallbackQuery", payload, &response); err != nil {
-		return err
-	}
-	if !response.OK {
-		return fmt.Errorf("telegram answerCallbackQuery failed: %s", response.Description)
-	}
-	return nil
-}
-
 func (c *Client) doJSONRequest(ctx context.Context, method, endpoint string, payload any, result any) error {
+	if c.httpClient == nil {
+		c.httpClient = &http.Client{}
+	}
+
 	var body io.Reader
 	if payload != nil {
 		data, err := json.Marshal(payload)
@@ -136,13 +449,8 @@ func (c *Client) doJSONRequest(ctx context.Context, method, endpoint string, pay
 	if err != nil {
 		return err
 	}
-
 	if resp.StatusCode >= http.StatusBadRequest {
-		return fmt.Errorf("telegram http %d: %s", resp.StatusCode, string(data))
+		return fmt.Errorf("compat http %d: %s", resp.StatusCode, string(data))
 	}
-
-	if err := json.Unmarshal(data, result); err != nil {
-		return err
-	}
-	return nil
+	return json.Unmarshal(data, result)
 }

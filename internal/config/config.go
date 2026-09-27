@@ -11,8 +11,10 @@ import (
 )
 
 type Config struct {
-	BotToken       string
-	AdminUserID    int64
+	AppID          int
+	AppHash        string
+	Phone          string
+	SessionFile    string
 	MonitorChatIDs map[int64]struct{}
 	AlertChatID    int64
 	KeywordsFile   string
@@ -65,11 +67,14 @@ func Load() (Config, error) {
 	recordsFile := getEnv("RECORDS_FILE", filepath.Join("data", "records.json"))
 	keywordsFile := getEnv("KEYWORDS_FILE", filepath.Join("configs", "keywords.example.json"))
 	settingsFile := getEnv("SETTINGS_FILE", filepath.Join("data", "settings.json"))
+	sessionFile := getEnv("SESSION_FILE", filepath.Join("data", "session.json"))
 	cooldownMinutes := getEnvInt("COOLDOWN_MINUTES", 1440)
 
 	cfg := Config{
-		BotToken:       strings.TrimSpace(os.Getenv("BOT_TOKEN")),
-		AdminUserID:    getEnvInt64("ADMIN_USER_ID", 0),
+		AppID:          getEnvInt("APP_ID", 0),
+		AppHash:        strings.TrimSpace(os.Getenv("APP_HASH")),
+		Phone:          strings.TrimSpace(os.Getenv("PHONE")),
+		SessionFile:    sessionFile,
 		MonitorChatIDs: parseChatIDs(getEnv("MONITOR_CHAT_IDS", os.Getenv("MONITOR_CHAT_ID"))),
 		AlertChatID:    getEnvInt64("ALERT_CHAT_ID", 0),
 		KeywordsFile:   keywordsFile,
@@ -83,11 +88,14 @@ func Load() (Config, error) {
 		LogLevel:       strings.ToLower(getEnv("LOG_LEVEL", "info")),
 	}
 
-	if cfg.BotToken == "" {
-		return Config{}, errors.New("BOT_TOKEN is required")
+	if cfg.AppID == 0 {
+		return Config{}, errors.New("APP_ID is required")
 	}
-	if cfg.AdminUserID == 0 {
-		return Config{}, errors.New("ADMIN_USER_ID is required")
+	if cfg.AppHash == "" {
+		return Config{}, errors.New("APP_HASH is required")
+	}
+	if cfg.Phone == "" {
+		return Config{}, errors.New("PHONE is required")
 	}
 	if cfg.QueueSize < 1 {
 		cfg.QueueSize = 100
