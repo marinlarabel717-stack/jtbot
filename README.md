@@ -1,10 +1,10 @@
 # jtbot
 
-JTBot is a Telegram keyword monitoring bot. The repository still contains the older Python implementation, and now also includes a Go version that focuses on a clean, maintainable core pipeline.
+JTBot is a Telegram keyword monitoring bot built in Go, with a clean, maintainable core pipeline and an inline-button admin panel.
 
-## Go Version
+## Features
 
-The current Go version provides:
+The current version provides:
 
 - Telegram Bot API long polling
 - keyword matching
@@ -13,11 +13,11 @@ The current Go version provides:
 - DM queue and sender worker
 - inline-button admin panel inside the bot chat
 
-Current Go limitation:
+Current limitation:
 
 - it uses Telegram Bot API, so direct messages only work if the target user has already opened a chat with the bot
 
-## Go Structure
+## Project Structure
 
 ```text
 cmd/jtbot/main.go
@@ -35,7 +35,7 @@ internal/storage
 pkg/tg
 ```
 
-## Go Run
+## Run
 
 1. Copy `.env.example` to `.env`
 2. Fill in `BOT_TOKEN` and `ADMIN_USER_ID`
@@ -44,7 +44,7 @@ pkg/tg
 5. Run `go run ./cmd/jtbot`
 6. Open a private chat with the bot and send `/start`
 
-## Go Admin Panel
+## Admin Panel
 
 The inline-button admin panel currently supports:
 
@@ -59,13 +59,7 @@ The inline-button admin panel currently supports:
 - remove monitored chat IDs
 - set the current chat as the alert chat
 
-## Python Files
-
-- `jtbot.py`: original Python bot
-- `requirements.txt`: Python dependencies
-- `proxy.txt`: optional proxy configuration
-
 ## Notes
 
 - runtime data such as `.env`, `data/`, session files, and exports are git-ignored
-- the Go and Python implementations currently coexist in the same repository, but the new work is being pushed into the Go path
+- deploy the bot with `go run ./cmd/jtbot` or a binary built from `./cmd/jtbot`
