@@ -1,6 +1,7 @@
 package tg
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	crand "crypto/rand"
@@ -17,7 +18,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gotd/td/examples"
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
 	"github.com/gotd/td/telegram/updates"
@@ -54,6 +54,15 @@ func NewClient(appID int, appHash, phone, sessionFile string, logger *logx.Logge
 	}
 }
 
+func NewBotAPIClient(token string) *Client {
+	token = strings.TrimSpace(token)
+	baseURL := ""
+	if token != "" {
+		baseURL = "https://api.telegram.org/bot" + token + "/"
+	}
+	return NewClientWithBaseURL(baseURL)
+}
+
 func NewClientWithBaseURL(baseURL string) *Client {
 	if baseURL != "" && !strings.HasSuffix(baseURL, "/") {
 		baseURL += "/"
@@ -88,11 +97,10 @@ func (c *Client) Run(ctx context.Context, handler func(context.Context, model.Up
 		UpdateHandler:  gaps,
 		Middlewares: []telegram.Middleware{
 			updhook.UpdateHook(gaps.Handle),
-			updhook.AffectedHook(gaps),
 		},
 	})
 
-	flow := auth.NewFlow(examples.Terminal{PhoneNumber: c.phone}, auth.SendCodeOptions{})
+	flow := auth.NewFlow(terminalAuth{phone: c.phone}, auth.SendCodeOptions{})
 
 	return client.Run(ctx, func(ctx context.Context) error {
 		if err := client.Auth().IfNecessary(ctx, flow); err != nil {
@@ -400,6 +408,7 @@ func mapTelegramUser(user *mtproto.User) *model.User {
 		LastName:     lastName,
 		Username:     username,
 		LanguageCode: langCode,
+		HasAvatar:    user.Photo != nil,
 	}
 }
 
@@ -409,6 +418,42 @@ func randomInt64() (int64, error) {
 		return 0, fmt.Errorf("generate random id: %w", err)
 	}
 	return int64(binary.LittleEndian.Uint64(buf[:])), nil
+}
+
+type terminalAuth struct {
+	phone string
+}
+
+func (t terminalAuth) Phone(context.Context) (string, error) {
+	return t.phone, nil
+}
+
+func (t terminalAuth) Password(ctx context.Context) (string, error) {
+	if password := strings.TrimSpace(os.Getenv("PASSWORD")); password != "" {
+		return password, nil
+	}
+	return promptTerminal("password (leave blank if not enabled): ")
+}
+
+func (t terminalAuth) AcceptTermsOfService(context.Context, mtproto.HelpTermsOfService) error {
+	return errors.New("sign up flow is not supported in terminal auth")
+}
+
+func (t terminalAuth) SignUp(context.Context) (auth.UserInfo, error) {
+	return auth.UserInfo{}, errors.New("sign up flow is not supported in terminal auth")
+}
+
+func (t terminalAuth) Code(context.Context, *mtproto.AuthSentCode) (string, error) {
+	return promptTerminal("code: ")
+}
+
+func promptTerminal(label string) (string, error) {
+	fmt.Print(label)
+	value, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(value), nil
 }
 
 type apiResponse[T any] struct {

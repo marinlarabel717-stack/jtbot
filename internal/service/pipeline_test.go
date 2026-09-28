@@ -70,7 +70,7 @@ func TestPipelineQueuesAndSendsDM(t *testing.T) {
 	m := matcher.NewKeywordMatcher()
 	ruleEngine := rules.NewEngine(settingsStore, recordStore)
 	dmSender := sender.New(client, recordStore, settingsStore, logger)
-	svc := NewTriggerService(m, keywordStore, ruleEngine, jobQueue, recordStore, client, settingsStore, logger)
+	svc := NewTriggerService(m, keywordStore, ruleEngine, jobQueue, recordStore, client, nil, settingsStore, nil, logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

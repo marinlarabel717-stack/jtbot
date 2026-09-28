@@ -11,6 +11,8 @@ import (
 )
 
 type Config struct {
+	BotToken       string
+	AdminUserID    int64
 	AppID          int
 	AppHash        string
 	Phone          string
@@ -20,6 +22,7 @@ type Config struct {
 	KeywordsFile   string
 	RecordsFile    string
 	SettingsFile   string
+	BlacklistFile  string
 	DMTemplate     string
 	Cooldown       time.Duration
 	QueueSize      int
@@ -67,10 +70,13 @@ func Load() (Config, error) {
 	recordsFile := getEnv("RECORDS_FILE", filepath.Join("data", "records.json"))
 	keywordsFile := getEnv("KEYWORDS_FILE", filepath.Join("configs", "keywords.example.json"))
 	settingsFile := getEnv("SETTINGS_FILE", filepath.Join("data", "settings.json"))
+	blacklistFile := getEnv("BLACKLIST_FILE", filepath.Join("data", "blacklist.json"))
 	sessionFile := getEnv("SESSION_FILE", filepath.Join("data", "session.json"))
 	cooldownMinutes := getEnvInt("COOLDOWN_MINUTES", 1440)
 
 	cfg := Config{
+		BotToken:       strings.TrimSpace(os.Getenv("BOT_TOKEN")),
+		AdminUserID:    getEnvInt64("ADMIN_USER_ID", 0),
 		AppID:          getEnvInt("APP_ID", 0),
 		AppHash:        strings.TrimSpace(os.Getenv("APP_HASH")),
 		Phone:          strings.TrimSpace(os.Getenv("PHONE")),
@@ -80,6 +86,7 @@ func Load() (Config, error) {
 		KeywordsFile:   keywordsFile,
 		RecordsFile:    recordsFile,
 		SettingsFile:   settingsFile,
+		BlacklistFile:  blacklistFile,
 		DMTemplate:     getEnv("DM_TEMPLATE", "你好，看到你刚刚在 {chat_title} 提到 {keywords}，如果你愿意的话可以继续聊聊。"),
 		Cooldown:       time.Duration(cooldownMinutes) * time.Minute,
 		QueueSize:      getEnvInt("QUEUE_SIZE", 100),

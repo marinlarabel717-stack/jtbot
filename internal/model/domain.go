@@ -39,6 +39,7 @@ type User struct {
 	LastName     string `json:"last_name"`
 	Username     string `json:"username"`
 	LanguageCode string `json:"language_code"`
+	HasAvatar    bool   `json:"has_avatar"`
 }
 
 type Entity struct {
@@ -66,10 +67,12 @@ type InlineKeyboardButton struct {
 type MatchRecord struct {
 	UserID    int64     `json:"user_id"`
 	Username  string    `json:"username"`
+	Name      string    `json:"name"`
 	ChatID    int64     `json:"chat_id"`
 	ChatTitle string    `json:"chat_title"`
 	Keyword   string    `json:"keyword"`
 	Message   string    `json:"message"`
+	Monitor   string    `json:"monitor"`
 	MatchedAt time.Time `json:"matched_at"`
 	UpdateID  int       `json:"update_id"`
 	MessageID int64     `json:"message_id"`

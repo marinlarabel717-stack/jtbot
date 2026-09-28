@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/marinlarabel717-stack/jtbot/internal/config"
+	"github.com/marinlarabel717-stack/jtbot/internal/listener"
 	"github.com/marinlarabel717-stack/jtbot/internal/logx"
 	"github.com/marinlarabel717-stack/jtbot/internal/matcher"
+	"github.com/marinlarabel717-stack/jtbot/internal/model"
 	"github.com/marinlarabel717-stack/jtbot/internal/queue"
 	"github.com/marinlarabel717-stack/jtbot/internal/rules"
 	"github.com/marinlarabel717-stack/jtbot/internal/sender"
@@ -19,12 +22,14 @@ import (
 )
 
 type App struct {
-	cfg     config.Config
-	logger  *logx.Logger
-	client  *tg.Client
-	trigger *service.TriggerService
-	sender  *sender.Sender
-	queue   *queue.MessageQueue
+	cfg         config.Config
+	logger      *logx.Logger
+	monitor     *tg.Client
+	adminBot    *tg.Client
+	adminPoller *listener.Poller
+	trigger     *service.TriggerService
+	sender      *sender.Sender
+	queue       *queue.MessageQueue
 }
 
 func New() (*App, error) {
@@ -53,11 +58,20 @@ func New() (*App, error) {
 		return nil, err
 	}
 
+	blacklistStore, err := storage.NewBlacklistStore(cfg.BlacklistFile)
+	if err != nil {
+		return nil, err
+	}
+
 	settingsStore, err := storage.NewSettingsStore(cfg.SettingsFile, storage.RuntimeSettings{
 		MonitoringEnabled: true,
 		MonitorChatIDs:    mapKeys(cfg.MonitorChatIDs),
 		AlertChatID:       cfg.AlertChatID,
 		CooldownMinutes:   int(cfg.Cooldown / time.Minute),
+		MaxMessageLength:  100,
+		FilterNoUsername:  true,
+		FilterNoAvatar:    false,
+		MinAccountAgeDays: 7,
 		DMTemplate:        cfg.DMTemplate,
 		DryRun:            cfg.DryRun,
 	})
@@ -65,27 +79,77 @@ func New() (*App, error) {
 		return nil, err
 	}
 
-	client := tg.NewClient(cfg.AppID, cfg.AppHash, cfg.Phone, cfg.SessionFile, logger)
+	monitorClient := tg.NewClient(cfg.AppID, cfg.AppHash, cfg.Phone, cfg.SessionFile, logger)
+	var adminClient *tg.Client
+	var adminPoller *listener.Poller
+	if cfg.BotToken != "" && cfg.AdminUserID != 0 {
+		adminClient = tg.NewBotAPIClient(cfg.BotToken)
+		adminSvc := service.NewAdminService(cfg.AdminUserID, adminClient, keywordStore, settingsStore, blacklistStore, logger)
+		adminPoller = listener.NewPoller(adminClient, cfg.PollTimeout, logger, func(ctx context.Context, update model.Update) error {
+			_, err := adminSvc.HandleUpdate(ctx, update)
+			return err
+		})
+	}
+
 	jobQueue := queue.NewMessageQueue(cfg.QueueSize)
 	m := matcher.NewKeywordMatcher()
 	ruleEngine := rules.NewEngine(settingsStore, recordStore)
-	dmSender := sender.New(client, recordStore, settingsStore, logger)
-	triggerSvc := service.NewTriggerService(m, keywordStore, ruleEngine, jobQueue, recordStore, client, settingsStore, logger)
+	dmSender := sender.New(monitorClient, recordStore, settingsStore, logger)
+	triggerSvc := service.NewTriggerService(m, keywordStore, ruleEngine, jobQueue, recordStore, monitorClient, adminClient, settingsStore, blacklistStore, logger)
 
 	return &App{
-		cfg:     cfg,
-		logger:  logger,
-		client:  client,
-		trigger: triggerSvc,
-		sender:  dmSender,
-		queue:   jobQueue,
+		cfg:         cfg,
+		logger:      logger,
+		monitor:     monitorClient,
+		adminBot:    adminClient,
+		adminPoller: adminPoller,
+		trigger:     triggerSvc,
+		sender:      dmSender,
+		queue:       jobQueue,
 	}, nil
 }
 
 func (a *App) Run(ctx context.Context) error {
 	a.logger.Infof("jtbot user session version started")
-	go a.sender.Run(ctx, a.queue.Consume())
-	return a.client.Run(ctx, a.trigger.HandleUpdate)
+	if a.adminPoller != nil {
+		a.logger.Infof("admin bot backend enabled")
+	}
+
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	errCh := make(chan error, 2)
+	var wg sync.WaitGroup
+
+	go a.sender.Run(runCtx, a.queue.Consume())
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		errCh <- a.monitor.Run(runCtx, a.trigger.HandleUpdate)
+	}()
+
+	if a.adminPoller != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errCh <- a.adminPoller.Run(runCtx)
+		}()
+	}
+
+	select {
+	case <-ctx.Done():
+		cancel()
+		wg.Wait()
+		return nil
+	case err := <-errCh:
+		cancel()
+		if err == nil {
+			wg.Wait()
+			return nil
+		}
+		return err
+	}
 }
 
 func mapKeys(input map[int64]struct{}) []int64 {

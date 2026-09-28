@@ -22,7 +22,9 @@ type TriggerService struct {
 	queue        *queue.MessageQueue
 	recordStore  *storage.RecordStore
 	client       *tg.Client
+	alertClient  *tg.Client
 	settings     *storage.SettingsStore
+	blacklist    *storage.BlacklistStore
 	logger       *logx.Logger
 }
 
@@ -33,7 +35,9 @@ func NewTriggerService(
 	queue *queue.MessageQueue,
 	recordStore *storage.RecordStore,
 	client *tg.Client,
+	alertClient *tg.Client,
 	settings *storage.SettingsStore,
+	blacklist *storage.BlacklistStore,
 	logger *logx.Logger,
 ) *TriggerService {
 	return &TriggerService{
@@ -43,7 +47,9 @@ func NewTriggerService(
 		queue:        queue,
 		recordStore:  recordStore,
 		client:       client,
+		alertClient:  alertClient,
 		settings:     settings,
+		blacklist:    blacklist,
 		logger:       logger,
 	}
 }
@@ -67,6 +73,28 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 		return nil
 	}
 
+	if s.blacklist != nil {
+		if s.blacklist.IsUserBlocked(msg.From.ID) || s.blacklist.IsChatBlocked(msg.Chat.ID) {
+			return nil
+		}
+	}
+
+	if maxLength := s.settings.MaxMessageLength(); maxLength > 0 && len([]rune(content)) > maxLength {
+		return nil
+	}
+
+	if s.settings.FilterNoUsername() && strings.TrimSpace(msg.From.Username) == "" {
+		return nil
+	}
+
+	if s.settings.FilterNoAvatar() && !msg.From.HasAvatar {
+		return nil
+	}
+
+	if minAgeDays := s.settings.MinAccountAgeDays(); minAgeDays > 0 && estimateAccountAgeDays(msg.From.ID) < minAgeDays {
+		return nil
+	}
+
 	keywords := s.matcher.Match(content, s.keywordStore.List())
 	if len(keywords) == 0 {
 		return nil
@@ -84,10 +112,12 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 		s.recordStore.SaveMatchRecord(model.MatchRecord{
 			UserID:    msg.From.ID,
 			Username:  msg.From.Username,
+			Name:      strings.TrimSpace(msg.From.FirstName + " " + msg.From.LastName),
 			ChatID:    msg.Chat.ID,
 			ChatTitle: chatTitle,
 			Keyword:   keyword,
 			Message:   content,
+			Monitor:   "user_session",
 			MatchedAt: time.Now(),
 			UpdateID:  update.UpdateID,
 			MessageID: msg.MessageID,
@@ -98,14 +128,28 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 
 	if alertChatID := s.settings.AlertChatID(); alertChatID != 0 {
 		alertText := fmt.Sprintf(
-			"关键词命中\n群: %s\n用户: @%s (%d)\n关键词: %s\n消息: %s",
+			"关键词命中\n群: %s\n用户: %s (%d)\n关键词: %s\n消息: %s",
 			chatTitle,
-			safeUsername(msg.From.Username),
+			formatUserLabel(msg.From),
 			msg.From.ID,
 			strings.Join(keywords, ", "),
 			content,
 		)
-		if err := s.client.SendMessage(ctx, alertChatID, alertText, nil); err != nil {
+		alertClient := s.alertClient
+		replyMarkup := (*model.InlineKeyboardMarkup)(nil)
+		if alertClient != nil {
+			replyMarkup = &model.InlineKeyboardMarkup{
+				InlineKeyboard: [][]model.InlineKeyboardButton{
+					{
+						{Text: "拉黑用户", CallbackData: fmt.Sprintf("admin:blacklist:user:%d:%s", msg.From.ID, safeUsername(msg.From.Username))},
+						{Text: "拉黑群", CallbackData: fmt.Sprintf("admin:blacklist:chat:%d", msg.Chat.ID)},
+					},
+				},
+			}
+		} else {
+			alertClient = s.client
+		}
+		if err := alertClient.SendMessage(ctx, alertChatID, alertText, replyMarkup); err != nil {
 			s.logger.Errorf("send alert failed: %v", err)
 		}
 	}
@@ -131,4 +175,30 @@ func safeUsername(username string) string {
 		return "no_username"
 	}
 	return username
+}
+
+func formatUserLabel(user *model.User) string {
+	if user == nil {
+		return "unknown"
+	}
+	if username := strings.TrimSpace(user.Username); username != "" {
+		return "@" + username
+	}
+	if name := strings.TrimSpace(user.FirstName + " " + user.LastName); name != "" {
+		return name
+	}
+	return "no_username"
+}
+
+func estimateAccountAgeDays(userID int64) int {
+	switch {
+	case userID < 1_000_000_000:
+		return 365 * 5
+	case userID < 2_000_000_000:
+		return 365 * 2
+	case userID < 5_000_000_000:
+		return 180
+	default:
+		return 30
+	}
 }

@@ -20,6 +20,10 @@ type RuntimeSettings struct {
 	MonitorChatIDs    []int64 `json:"monitor_chat_ids"`
 	AlertChatID       int64   `json:"alert_chat_id"`
 	CooldownMinutes   int     `json:"cooldown_minutes"`
+	MaxMessageLength  int     `json:"max_message_length"`
+	FilterNoUsername  bool    `json:"filter_no_username"`
+	FilterNoAvatar    bool    `json:"filter_no_avatar"`
+	MinAccountAgeDays int     `json:"min_account_age_days"`
 	DMTemplate        string  `json:"dm_template"`
 	DryRun            bool    `json:"dry_run"`
 }
@@ -47,21 +51,56 @@ func (s *SettingsStore) load() error {
 		return nil
 	}
 
-	var loaded RuntimeSettings
-	if err := json.Unmarshal(data, &loaded); err != nil {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 
-	s.state.MonitoringEnabled = loaded.MonitoringEnabled
-	s.state.MonitorChatIDs = normalizeChatIDs(loaded.MonitorChatIDs)
-	s.state.AlertChatID = loaded.AlertChatID
-	if loaded.CooldownMinutes > 0 {
-		s.state.CooldownMinutes = loaded.CooldownMinutes
+	if value, ok := raw["monitoring_enabled"]; ok {
+		_ = json.Unmarshal(value, &s.state.MonitoringEnabled)
 	}
-	if loaded.DMTemplate != "" {
-		s.state.DMTemplate = loaded.DMTemplate
+	if value, ok := raw["monitor_chat_ids"]; ok {
+		var ids []int64
+		if err := json.Unmarshal(value, &ids); err == nil {
+			s.state.MonitorChatIDs = normalizeChatIDs(ids)
+		}
 	}
-	s.state.DryRun = loaded.DryRun
+	if value, ok := raw["alert_chat_id"]; ok {
+		_ = json.Unmarshal(value, &s.state.AlertChatID)
+	}
+	if value, ok := raw["cooldown_minutes"]; ok {
+		var minutes int
+		if err := json.Unmarshal(value, &minutes); err == nil && minutes > 0 {
+			s.state.CooldownMinutes = minutes
+		}
+	}
+	if value, ok := raw["max_message_length"]; ok {
+		var maxLength int
+		if err := json.Unmarshal(value, &maxLength); err == nil && maxLength > 0 {
+			s.state.MaxMessageLength = maxLength
+		}
+	}
+	if value, ok := raw["filter_no_username"]; ok {
+		_ = json.Unmarshal(value, &s.state.FilterNoUsername)
+	}
+	if value, ok := raw["filter_no_avatar"]; ok {
+		_ = json.Unmarshal(value, &s.state.FilterNoAvatar)
+	}
+	if value, ok := raw["min_account_age_days"]; ok {
+		var days int
+		if err := json.Unmarshal(value, &days); err == nil && days > 0 {
+			s.state.MinAccountAgeDays = days
+		}
+	}
+	if value, ok := raw["dm_template"]; ok {
+		var template string
+		if err := json.Unmarshal(value, &template); err == nil && template != "" {
+			s.state.DMTemplate = template
+		}
+	}
+	if value, ok := raw["dry_run"]; ok {
+		_ = json.Unmarshal(value, &s.state.DryRun)
+	}
 	return nil
 }
 
@@ -177,6 +216,58 @@ func (s *SettingsStore) DMTemplate() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.state.DMTemplate
+}
+
+func (s *SettingsStore) MaxMessageLength() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.state.MaxMessageLength
+}
+
+func (s *SettingsStore) SetMaxMessageLength(length int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.state.MaxMessageLength = length
+	return s.persistLocked()
+}
+
+func (s *SettingsStore) FilterNoUsername() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.state.FilterNoUsername
+}
+
+func (s *SettingsStore) ToggleFilterNoUsername() (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.state.FilterNoUsername = !s.state.FilterNoUsername
+	return s.state.FilterNoUsername, s.persistLocked()
+}
+
+func (s *SettingsStore) FilterNoAvatar() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.state.FilterNoAvatar
+}
+
+func (s *SettingsStore) ToggleFilterNoAvatar() (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.state.FilterNoAvatar = !s.state.FilterNoAvatar
+	return s.state.FilterNoAvatar, s.persistLocked()
+}
+
+func (s *SettingsStore) MinAccountAgeDays() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.state.MinAccountAgeDays
+}
+
+func (s *SettingsStore) SetMinAccountAgeDays(days int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.state.MinAccountAgeDays = days
+	return s.persistLocked()
 }
 
 func (s *SettingsStore) SetDMTemplate(template string) error {
