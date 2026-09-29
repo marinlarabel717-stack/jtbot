@@ -354,9 +354,29 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 	case callbackDMTemplates:
 		text, keyboard = s.dmTemplatesText(), s.dmTemplatesKeyboard()
 	case callbackDMTemplateAdd:
-		s.setPending(callback.From.ID, pendingAddDMTemplate)
-		text, keyboard = s.dmTemplateAddPrompt(), s.dmTemplatesKeyboard()
-		alert = "等待你发送话术模板"
+		s.setPending(callback.From.ID, pendingNone)
+		text, keyboard = "选择要添加的话术发送模式。", s.dmTemplateModeKeyboard()
+		alert = "请选择话术发送模式"
+	case callbackDMTemplateAddText:
+		s.setPending(callback.From.ID, pendingAddDMText)
+		text, keyboard = s.dmTemplateTextPrompt(), s.dmTemplateModeKeyboard()
+		alert = "发送文本话术内容"
+	case callbackDMTemplateAddPost:
+		s.setPending(callback.From.ID, pendingAddDMPostBot)
+		text, keyboard = s.dmTemplatePostBotPrompt(), s.dmTemplateModeKeyboard()
+		alert = "发送 PostBot 代码"
+	case callbackDMTemplateAddFwd:
+		s.setPending(callback.From.ID, pendingAddDMForward)
+		text, keyboard = s.dmTemplateForwardPrompt(false), s.dmTemplateModeKeyboard()
+		alert = "发送频道贴文链接"
+	case callbackDMTemplateAddHide:
+		s.setPending(callback.From.ID, pendingAddDMHidden)
+		text, keyboard = s.dmTemplateForwardPrompt(true), s.dmTemplateModeKeyboard()
+		alert = "发送隐藏来源转发链接"
+	case callbackDMTemplateAddQuick:
+		s.setPending(callback.From.ID, pendingAddDMQuickReply)
+		text, keyboard = s.dmTemplateQuickReplyPrompt(), s.dmTemplateModeKeyboard()
+		alert = "发送快捷回复 ID"
 	case callbackDMTemplateRemove:
 		s.setPending(callback.From.ID, pendingRemoveDMTpl)
 		text, keyboard = "发送要删除的话术编号或内容，支持一次删除多条，使用 |、换行或逗号分隔。", s.dmTemplatesKeyboard()
@@ -664,6 +684,20 @@ func (s *AdminService) handlePendingInput(ctx context.Context, msg *model.Messag
 			_ = s.settings.SetDMTemplate(templates[0])
 		}
 		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("已添加 %d 条话术。\n\n%s", added, s.dmTemplatesText()), s.dmTemplatesKeyboard())
+	case pendingAddDMText:
+		return s.handleAddSingleDMTemplate(ctx, msg.Chat.ID, model.EncodeTextDMTemplate(text), "文本直发")
+	case pendingAddDMPostBot:
+		return s.handleAddSingleDMTemplate(ctx, msg.Chat.ID, model.EncodePostBotDMTemplate(text), "内联Bot @PostBot")
+	case pendingAddDMForward:
+		return s.handleAddSingleDMTemplate(ctx, msg.Chat.ID, model.EncodeForwardDMTemplate(text), "频道贴文转发")
+	case pendingAddDMHidden:
+		return s.handleAddSingleDMTemplate(ctx, msg.Chat.ID, model.EncodeHiddenForwardDMTemplate(text), "隐藏转发来源")
+	case pendingAddDMQuickReply:
+		shortcutID, err := parseNonNegativeInt(text)
+		if err != nil || shortcutID <= 0 {
+			return s.client.SendMessage(ctx, msg.Chat.ID, "企业快捷回复 ID 必须是大于 0 的数字。", s.dmTemplateModeKeyboard())
+		}
+		return s.handleAddSingleDMTemplate(ctx, msg.Chat.ID, model.EncodeQuickReplyDMTemplate(shortcutID), "企业快捷回复")
 	case pendingRemoveDMTpl:
 		removedTargets := resolveDMTemplateRemovals(text, s.settings.ListDMTemplates())
 		if len(removedTargets) == 0 {
@@ -1030,6 +1064,40 @@ func (s *AdminService) dmTemplateAddPrompt() string {
 	}, "\n")
 }
 
+func (s *AdminService) dmTemplateTextPrompt() string {
+	return "发送文本私信内容。\n\n支持变量：{username} {chat_title} {keywords} {message}"
+}
+
+func (s *AdminService) dmTemplatePostBotPrompt() string {
+	return "发送 PostBot 的内联代码。\n\n例如：abc123"
+}
+
+func (s *AdminService) dmTemplateForwardPrompt(hidden bool) string {
+	if hidden {
+		return "发送要隐藏来源转发的频道贴文链接。\n\n例如：https://t.me/channelname/123"
+	}
+	return "发送要转发的频道贴文链接。\n\n例如：https://t.me/channelname/123"
+}
+
+func (s *AdminService) dmTemplateQuickReplyPrompt() string {
+	return "发送企业快捷回复 ID。\n\n例如：123"
+}
+
+func (s *AdminService) handleAddSingleDMTemplate(ctx context.Context, chatID int64, encoded, label string) error {
+	encoded = strings.TrimSpace(encoded)
+	if encoded == "" {
+		return s.client.SendMessage(ctx, chatID, "内容不能为空。", s.dmTemplateModeKeyboard())
+	}
+	added, err := s.settings.AddDMTemplates([]string{encoded})
+	if err != nil {
+		return err
+	}
+	if added > 0 {
+		_ = s.settings.SetDMTemplate(encoded)
+	}
+	return s.client.SendMessage(ctx, chatID, fmt.Sprintf("已添加 %s 话术。\n\n%s", label, s.dmTemplatesText()), s.dmTemplatesKeyboard())
+}
+
 func (s *AdminService) dmRecordsText() string {
 	records := s.recordStore.DMRecords()
 	if len(records) == 0 {
@@ -1333,11 +1401,32 @@ func (s *AdminService) dmTemplatesKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{
-				{Text: "âž• æ·»åŠ è¯æœ¯", CallbackData: callbackDMTemplateAdd},
-				{Text: "âž– åˆ é™¤è¯æœ¯", CallbackData: callbackDMTemplateRemove},
+				{Text: "➕ 添加话术", CallbackData: callbackDMTemplateAdd},
+				{Text: "➖ 删除话术", CallbackData: callbackDMTemplateRemove},
 			},
 			{
-				{Text: "ðŸ”™ è¿”å›ž", CallbackData: callbackDMPool},
+				{Text: "🔙 返回", CallbackData: callbackDMPool},
+			},
+		},
+	}
+}
+
+func (s *AdminService) dmTemplateModeKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{
+				{Text: "📝 文本直发", CallbackData: callbackDMTemplateAddText},
+				{Text: "🤖 内联Bot", CallbackData: callbackDMTemplateAddPost},
+			},
+			{
+				{Text: "📢 频道转发", CallbackData: callbackDMTemplateAddFwd},
+				{Text: "🕶 隐藏来源转发", CallbackData: callbackDMTemplateAddHide},
+			},
+			{
+				{Text: "🏢 企业快捷回复", CallbackData: callbackDMTemplateAddQuick},
+			},
+			{
+				{Text: "🔙 返回话术列表", CallbackData: callbackDMTemplates},
 			},
 		},
 	}
