@@ -131,12 +131,14 @@ func TestTriggerServiceFormatsAlertText(t *testing.T) {
 	t.Parallel()
 
 	var sentText string
+	var replyMarkup map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var payload map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode payload: %v", err)
 		}
 		sentText, _ = payload["text"].(string)
+		replyMarkup, _ = payload["reply_markup"].(map[string]any)
 		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "result": map[string]any{"message_id": 1}})
 	}))
 	defer server.Close()
@@ -171,18 +173,19 @@ func TestTriggerServiceFormatsAlertText(t *testing.T) {
 		t.Fatalf("handle update: %v", err)
 	}
 
-	if !strings.Contains(sentText, "精准获客-自动私信") {
-		t.Fatalf("expected branded alert text, got %q", sentText)
+	if strings.Contains(sentText, "精准获客-自动私信") {
+		t.Fatalf("expected title prefix to be removed, got %q", sentText)
 	}
 	if !strings.Contains(sentText, "来源群组: 头铁出海 项目资源交流 4群") {
 		t.Fatalf("expected chat title in alert text, got %q", sentText)
 	}
-	if !strings.Contains(sentText, "群组链接: https://t.me/toutiechuhai04") {
+	if !strings.Contains(sentText, "群组链接: t.me/toutiechuhai04") {
 		t.Fatalf("expected chat link in alert text, got %q", sentText)
 	}
 	if !strings.Contains(sentText, "发送用户: 大户人家-数据 (@UUZVI)") {
 		t.Fatalf("expected user label in alert text, got %q", sentText)
 	}
+	assertAlertButtons(t, replyMarkup)
 }
 
 func newTriggerTestService(t *testing.T, defaults storage.RuntimeSettings) (*TriggerService, *storage.RecordStore, *storage.BlacklistStore) {
@@ -219,4 +222,27 @@ func newTriggerTestService(t *testing.T, defaults storage.RuntimeSettings) (*Tri
 	ruleEngine := rules.NewEngine(settingsStore, recordStore)
 
 	return NewTriggerService(m, keywordStore, ruleEngine, jobQueue, recordStore, client, nil, settingsStore, blacklistStore, "test-monitor", logx.New("debug")), recordStore, blacklistStore
+}
+
+func assertAlertButtons(t *testing.T, replyMarkup map[string]any) {
+	t.Helper()
+
+	rows, ok := replyMarkup["inline_keyboard"].([]any)
+	if !ok || len(rows) < 2 {
+		t.Fatalf("expected two keyboard rows, got %#v", replyMarkup)
+	}
+
+	firstRow, ok := rows[0].([]any)
+	if !ok || len(firstRow) < 2 {
+		t.Fatalf("expected action row with two buttons, got %#v", rows[0])
+	}
+
+	firstButton, _ := firstRow[0].(map[string]any)
+	secondButton, _ := firstRow[1].(map[string]any)
+	if firstButton["text"] != "🚀 直达消息" || firstButton["url"] != "https://t.me/toutiechuhai04/99" {
+		t.Fatalf("unexpected direct message button: %#v", firstButton)
+	}
+	if secondButton["text"] != "💬 一键私信" || secondButton["url"] != "https://t.me/UUZVI" {
+		t.Fatalf("unexpected one-click dm button: %#v", secondButton)
+	}
 }

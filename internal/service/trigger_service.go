@@ -108,6 +108,8 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 		chatTitle = msg.Chat.DisplayTitle()
 	}
 	chatLink := msg.Chat.Link(msg.MessageID)
+	messageLink := msg.Chat.MessageLink(msg.MessageID)
+	userLink := msg.From.DialogLink()
 	matchedAt := time.Now()
 
 	for _, keyword := range keywords {
@@ -133,7 +135,7 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 		alertClient := s.alertClient
 		replyMarkup := (*model.InlineKeyboardMarkup)(nil)
 		if alertClient != nil {
-			replyMarkup = buildMatchAlertKeyboard(msg, chatLink)
+			replyMarkup = buildMatchAlertKeyboard(msg, messageLink, userLink)
 		} else {
 			alertClient = s.client
 		}
@@ -201,11 +203,10 @@ func formatAlertUserLabel(user *model.User) string {
 
 func formatMatchAlertText(chatTitle, chatLink string, user *model.User, monitorLabel string, keywords []string, matchedAt time.Time, content string) string {
 	lines := []string{
-		"精准获客-自动私信",
 		"🔔 关键词触发提醒",
 		"",
 		fmt.Sprintf("📍 来源群组: %s", safeValue(chatTitle, "unknown")),
-		fmt.Sprintf("🔗 群组链接: %s", safeValue(chatLink, "暂无公开链接")),
+		fmt.Sprintf("🔗 群组链接: %s", displayLink(chatLink)),
 		fmt.Sprintf("👤 发送用户: %s", formatAlertUserLabel(user)),
 		fmt.Sprintf("🆔 用户ID: %d", userID(user)),
 		fmt.Sprintf("🔑 触发关键词: %s", strings.Join(keywords, ", ")),
@@ -218,12 +219,17 @@ func formatMatchAlertText(chatTitle, chatLink string, user *model.User, monitorL
 	return strings.Join(lines, "\n")
 }
 
-func buildMatchAlertKeyboard(msg *model.Message, chatLink string) *model.InlineKeyboardMarkup {
+func buildMatchAlertKeyboard(msg *model.Message, messageLink, userLink string) *model.InlineKeyboardMarkup {
 	rows := make([][]model.InlineKeyboardButton, 0, 3)
-	if strings.TrimSpace(chatLink) != "" {
-		rows = append(rows, []model.InlineKeyboardButton{
-			{Text: "🚀 直达消息", URL: chatLink},
-		})
+	actionRow := make([]model.InlineKeyboardButton, 0, 2)
+	if strings.TrimSpace(messageLink) != "" {
+		actionRow = append(actionRow, model.InlineKeyboardButton{Text: "🚀 直达消息", URL: messageLink})
+	}
+	if strings.TrimSpace(userLink) != "" {
+		actionRow = append(actionRow, model.InlineKeyboardButton{Text: "💬 一键私信", URL: userLink})
+	}
+	if len(actionRow) > 0 {
+		rows = append(rows, actionRow)
 	}
 	rows = append(rows,
 		[]model.InlineKeyboardButton{
@@ -239,6 +245,16 @@ func safeValue(value, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func displayLink(link string) string {
+	link = strings.TrimSpace(link)
+	if link == "" {
+		return "暂无公开链接"
+	}
+	link = strings.TrimPrefix(link, "https://")
+	link = strings.TrimPrefix(link, "http://")
+	return link
 }
 
 func userID(user *model.User) int64 {

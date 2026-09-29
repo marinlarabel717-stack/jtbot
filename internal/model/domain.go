@@ -65,6 +65,16 @@ func (c Chat) Link(messageID int64) string {
 	return ""
 }
 
+func (c Chat) MessageLink(messageID int64) string {
+	if messageID <= 0 {
+		return ""
+	}
+	if username := strings.TrimSpace(strings.TrimPrefix(c.Username, "@")); username != "" {
+		return "https://t.me/" + username + "/" + strconv.FormatInt(messageID, 10)
+	}
+	return c.Link(messageID)
+}
+
 type User struct {
 	ID           int64  `json:"id"`
 	IsBot        bool   `json:"is_bot"`
@@ -74,6 +84,16 @@ type User struct {
 	Phone        string `json:"phone,omitempty"`
 	LanguageCode string `json:"language_code"`
 	HasAvatar    bool   `json:"has_avatar"`
+}
+
+func (u User) DialogLink() string {
+	if username := strings.TrimSpace(strings.TrimPrefix(u.Username, "@")); username != "" {
+		return "https://t.me/" + username
+	}
+	if u.ID > 0 {
+		return "tg://user?id=" + strconv.FormatInt(u.ID, 10)
+	}
+	return ""
 }
 
 type Entity struct {
