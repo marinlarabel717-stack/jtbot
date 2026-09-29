@@ -288,7 +288,7 @@ func newAdminTestServiceWithAuth(t *testing.T, client *tg.Client, authInput *tg.
 		submitter = authInput
 	}
 
-	admin := NewAdminService(123, client, keywordStore, settingsStore, blacklistStore, submitter, adminTestMonitorManager{}, recordStore, logx.New("debug"))
+	admin := NewAdminService(123, client, keywordStore, settingsStore, blacklistStore, submitter, adminTestMonitorManager{}, adminTestDMManager{}, recordStore, logx.New("debug"))
 	return admin, settingsStore, blacklistStore
 }
 
@@ -319,5 +319,31 @@ func (adminTestMonitorManager) RestartMonitor(context.Context, string) error {
 }
 
 func (adminTestMonitorManager) DeleteMonitor(context.Context, string) error {
+	return nil
+}
+
+type adminTestDMManager struct{}
+
+func (adminTestDMManager) StartDMLogin(context.Context, string) (string, error) {
+	return "ok", nil
+}
+
+func (adminTestDMManager) DMCounts() (int, int) {
+	return 1, 1
+}
+
+func (adminTestDMManager) ListDMAccounts() []DMAccountInfo {
+	return []DMAccountInfo{{Phone: "+999", Online: true}}
+}
+
+func (adminTestDMManager) GetDMAccount(phone string) (DMAccountInfo, bool) {
+	return DMAccountInfo{Phone: phone, Online: true, SessionFile: "dm.json"}, true
+}
+
+func (adminTestDMManager) RestartDMAccount(context.Context, string) error {
+	return nil
+}
+
+func (adminTestDMManager) DeleteDMAccount(context.Context, string) error {
 	return nil
 }

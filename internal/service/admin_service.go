@@ -28,6 +28,17 @@ const (
 	callbackKeywordAdd          = "admin:keyword:add"
 	callbackKeywordRemove       = "admin:keyword:remove"
 	callbackDMPool              = "admin:dm_pool"
+	callbackDMConnect           = "admin:dm:connect"
+	callbackDMList              = "admin:dm:list"
+	callbackDMDetailPrefix      = "admin:dm:detail:"
+	callbackDMRetryPrefix       = "admin:dm:retry:"
+	callbackDMDeletePrefix      = "admin:dm:delete:"
+	callbackDMTemplates         = "admin:dm:templates"
+	callbackDMTemplateAdd       = "admin:dm:template:add"
+	callbackDMTemplateRemove    = "admin:dm:template:remove"
+	callbackDMRecords           = "admin:dm:records"
+	callbackDMExportFailed      = "admin:dm:export_failed"
+	callbackDMSettings          = "admin:dm:settings"
 	callbackExport              = "admin:export"
 	callbackExportByTime        = "admin:export:time"
 	callbackExportByKeyword     = "admin:export:keyword"
@@ -61,10 +72,13 @@ type pendingAction string
 const (
 	pendingNone          pendingAction = ""
 	pendingLoginMonitor  pendingAction = "login_monitor"
+	pendingLoginDM       pendingAction = "login_dm"
 	pendingAddKeywords   pendingAction = "add_keywords"
 	pendingRemoveKeyword pendingAction = "remove_keywords"
 	pendingSetCooldown   pendingAction = "set_cooldown"
 	pendingSetTemplate   pendingAction = "set_template"
+	pendingAddDMTemplate pendingAction = "add_dm_template"
+	pendingRemoveDMTpl   pendingAction = "remove_dm_template"
 	pendingSetMaxLength  pendingAction = "set_max_length"
 	pendingSetMinAge     pendingAction = "set_min_age"
 	pendingAddChatIDs    pendingAction = "add_chat_ids"
@@ -101,6 +115,13 @@ type MonitorAccountInfo struct {
 	LastError   string
 }
 
+type DMAccountInfo struct {
+	Phone       string
+	SessionFile string
+	Online      bool
+	LastError   string
+}
+
 type MonitorLoginManager interface {
 	StartMonitorLogin(ctx context.Context, phone string) (string, error)
 	MonitorSummary() string
@@ -109,6 +130,15 @@ type MonitorLoginManager interface {
 	GetMonitorAccount(phone string) (MonitorAccountInfo, bool)
 	RestartMonitor(ctx context.Context, phone string) error
 	DeleteMonitor(ctx context.Context, phone string) error
+}
+
+type DMPoolManager interface {
+	StartDMLogin(ctx context.Context, phone string) (string, error)
+	DMCounts() (active int, total int)
+	ListDMAccounts() []DMAccountInfo
+	GetDMAccount(phone string) (DMAccountInfo, bool)
+	RestartDMAccount(ctx context.Context, phone string) error
+	DeleteDMAccount(ctx context.Context, phone string) error
 }
 
 type messageClient interface {
@@ -123,6 +153,7 @@ type AdminService struct {
 	client         messageClient
 	authInput      AuthSubmitter
 	monitorManager MonitorLoginManager
+	dmManager      DMPoolManager
 	keywordStore   *storage.KeywordStore
 	settings       *storage.SettingsStore
 	blacklist      *storage.BlacklistStore
@@ -142,6 +173,7 @@ func NewAdminService(
 	blacklist *storage.BlacklistStore,
 	authInput AuthSubmitter,
 	monitorManager MonitorLoginManager,
+	dmManager DMPoolManager,
 	recordStore *storage.RecordStore,
 	logger *logx.Logger,
 ) *AdminService {
@@ -150,6 +182,7 @@ func NewAdminService(
 		client:         client,
 		authInput:      authInput,
 		monitorManager: monitorManager,
+		dmManager:      dmManager,
 		keywordStore:   keywordStore,
 		settings:       settings,
 		blacklist:      blacklist,
@@ -241,6 +274,32 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 		alert = "等待你发送要删除的关键词"
 	case callbackDMPool:
 		text, keyboard = s.dmPoolText(), s.dmPoolKeyboard()
+	case callbackDMConnect:
+		s.setPending(callback.From.ID, pendingLoginDM)
+		text, keyboard = s.dmConnectPrompt(), s.dmPoolKeyboard()
+		alert = "把私信号手机号直接发给我"
+	case callbackDMList:
+		text, keyboard = s.dmAccountsText(), s.dmAccountsKeyboard()
+	case callbackDMTemplates:
+		text, keyboard = s.dmTemplatesText(), s.dmTemplatesKeyboard()
+	case callbackDMTemplateAdd:
+		s.setPending(callback.From.ID, pendingAddDMTemplate)
+		text, keyboard = "发送要添加的话术模板，多条可用 --- 分隔。", s.dmTemplatesKeyboard()
+		alert = "等待你发送话术模板"
+	case callbackDMTemplateRemove:
+		s.setPending(callback.From.ID, pendingRemoveDMTpl)
+		text, keyboard = "发送要删除的话术内容，支持一次删除多条，使用 | 或换行分隔。", s.dmTemplatesKeyboard()
+		alert = "等待你发送要删除的话术"
+	case callbackDMRecords:
+		text, keyboard = s.dmRecordsText(), s.dmRecordsKeyboard()
+	case callbackDMExportFailed:
+		err = s.sendFailedDMExport(ctx, callback.Message.Chat.ID)
+		alert = "异常私信记录已导出"
+		if err == nil {
+			text, keyboard = s.dmRecordsText(), s.dmRecordsKeyboard()
+		}
+	case callbackDMSettings:
+		text, keyboard = s.dmSettingsText(), s.dmSettingsKeyboard()
 	case callbackExport:
 		text, keyboard = s.exportText(), s.exportKeyboard()
 	case callbackExportByTime:
@@ -367,6 +426,23 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 				alert = "监控号已删除"
 				text, keyboard = s.accountsListText(), s.accountsListKeyboard()
 			}
+		case strings.HasPrefix(callback.Data, callbackDMDetailPrefix):
+			phone := strings.TrimPrefix(callback.Data, callbackDMDetailPrefix)
+			text, keyboard, err = s.dmAccountDetailText(phone)
+		case strings.HasPrefix(callback.Data, callbackDMRetryPrefix):
+			phone := strings.TrimPrefix(callback.Data, callbackDMRetryPrefix)
+			err = s.dmManager.RestartDMAccount(ctx, phone)
+			if err == nil {
+				alert = "已重新连接私信号"
+				text, keyboard, _ = s.dmAccountDetailText(phone)
+			}
+		case strings.HasPrefix(callback.Data, callbackDMDeletePrefix):
+			phone := strings.TrimPrefix(callback.Data, callbackDMDeletePrefix)
+			err = s.dmManager.DeleteDMAccount(ctx, phone)
+			if err == nil {
+				alert = "私信号已删除"
+				text, keyboard = s.dmAccountsText(), s.dmAccountsKeyboard()
+			}
 		case strings.HasPrefix(callback.Data, callbackBlockUser):
 			alert, err = s.blockUserCallback(callback.Data)
 		case strings.HasPrefix(callback.Data, callbackBlockChat):
@@ -412,6 +488,22 @@ func (s *AdminService) handlePendingInput(ctx context.Context, msg *model.Messag
 			return s.client.SendMessage(ctx, msg.Chat.ID, "启动登录失败: "+err.Error(), s.backToAccountsKeyboard())
 		}
 		return s.client.SendMessage(ctx, msg.Chat.ID, result+"\n\n"+s.accountsOverviewText(), s.accountsMenuKeyboard())
+	case pendingLoginDM:
+		phones := splitInputParts(text)
+		if len(phones) == 0 {
+			return s.client.SendMessage(ctx, msg.Chat.ID, "手机号不能为空。", s.dmPoolKeyboard())
+		}
+		if len(phones) > 1 {
+			return s.client.SendMessage(ctx, msg.Chat.ID, "一次先登录一个私信号。多个私信号请逐个添加。", s.dmPoolKeyboard())
+		}
+		if s.dmManager == nil {
+			return s.client.SendMessage(ctx, msg.Chat.ID, "当前没有可用的私信号管理器。", s.dmPoolKeyboard())
+		}
+		result, err := s.dmManager.StartDMLogin(ctx, phones[0])
+		if err != nil {
+			return s.client.SendMessage(ctx, msg.Chat.ID, "启动私信号登录失败: "+err.Error(), s.dmPoolKeyboard())
+		}
+		return s.client.SendMessage(ctx, msg.Chat.ID, result+"\n\n"+s.dmPoolText(), s.dmPoolKeyboard())
 	case pendingAddKeywords:
 		added, err := s.keywordStore.Add(splitInputParts(text))
 		if err != nil {
@@ -441,6 +533,25 @@ func (s *AdminService) handlePendingInput(ctx context.Context, msg *model.Messag
 			return err
 		}
 		return s.client.SendMessage(ctx, msg.Chat.ID, "私信模板已更新。\n\n"+s.rulesText(), s.rulesKeyboard())
+	case pendingAddDMTemplate:
+		templates := splitTemplateParts(text)
+		if len(templates) == 0 {
+			return s.client.SendMessage(ctx, msg.Chat.ID, "模板不能为空。", s.dmTemplatesKeyboard())
+		}
+		added, err := s.settings.AddDMTemplates(templates)
+		if err != nil {
+			return err
+		}
+		if added > 0 {
+			_ = s.settings.SetDMTemplate(templates[0])
+		}
+		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("已添加 %d 条话术。\n\n%s", added, s.dmTemplatesText()), s.dmTemplatesKeyboard())
+	case pendingRemoveDMTpl:
+		removed, err := s.settings.RemoveDMTemplates(splitInputParts(text))
+		if err != nil {
+			return err
+		}
+		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("已删除 %d 条话术。\n\n%s", removed, s.dmTemplatesText()), s.dmTemplatesKeyboard())
 	case pendingSetMaxLength:
 		maxLength, err := parseNonNegativeInt(text)
 		if err != nil || maxLength < 0 {
@@ -605,12 +716,133 @@ func (s *AdminService) keywordsText() string {
 }
 
 func (s *AdminService) dmPoolText() string {
+	active, total := 0, 0
+	if s.dmManager != nil {
+		active, total = s.dmManager.DMCounts()
+	}
 	todaySent, todaySuccess, todayFailed := s.dmStatsToday()
+	templates := s.settings.ListDMTemplates()
 	return fmt.Sprintf(
-		"💬 私信号池\n\n当前 Go 版正在迁移 Python 版私信号池能力。\n\n今天私信记录：发送 %d | 成功 %d | 失败 %d\n\n下一步会继续补：\n• 私信账号池管理\n• 话术模板\n• 发送设置\n• 私信记录与异常号导出",
+		"💬 私信号池\n\n已登录账号: %d\n在线: %d | 离线: %d\n话术模板: %d 条\n今日私信: 发送 %d | 成功 %d | 失败 %d\n\nGo 版这里改成“手机号手动登录多个私信号”，不再依赖 Python 的 Telethon session 上传链路。",
+		total,
+		active,
+		total-active,
+		len(templates),
 		todaySent,
 		todaySuccess,
 		todayFailed,
+	)
+}
+
+func (s *AdminService) dmConnectPrompt() string {
+	return "请输入私信号手机号。\n\n支持格式：\n• +8613800138000\n• 8613800138000\n• +66955305284"
+}
+
+func (s *AdminService) dmAccountsText() string {
+	accounts := s.listDMAccounts()
+	if len(accounts) == 0 {
+		return "❌ 暂无私信号\n\n点击“连接私信号”开始添加。"
+	}
+
+	lines := []string{fmt.Sprintf("📋 私信号列表 (%d个)：", len(accounts)), ""}
+	for i, account := range accounts {
+		status := "🔴 离线"
+		if account.Online {
+			status = "🟢 在线"
+		}
+		line := fmt.Sprintf("%d. %s %s", i+1, account.Phone, status)
+		if account.LastError != "" && !account.Online {
+			line += " | " + account.LastError
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (s *AdminService) dmAccountDetailText(phone string) (string, *model.InlineKeyboardMarkup, error) {
+	account, ok := s.dmManager.GetDMAccount(phone)
+	if !ok {
+		return "", nil, fmt.Errorf("私信号不存在")
+	}
+
+	status := "🔴 离线"
+	if account.Online {
+		status = "🟢 在线"
+	}
+	text := fmt.Sprintf("💬 私信号详情\n\n手机号: %s\n状态: %s\nSession: %s", account.Phone, status, filepathBase(account.SessionFile))
+	if strings.TrimSpace(account.LastError) != "" {
+		text += "\n错误: " + account.LastError
+	}
+
+	keyboard := &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{
+				{Text: "🔄 重新连接", CallbackData: callbackDMRetryPrefix + account.Phone},
+				{Text: "❌ 删除账号", CallbackData: callbackDMDeletePrefix + account.Phone},
+			},
+			{
+				{Text: "🔙 返回列表", CallbackData: callbackDMList},
+			},
+		},
+	}
+	return text, keyboard, nil
+}
+
+func (s *AdminService) dmTemplatesText() string {
+	templates := s.settings.ListDMTemplates()
+	if len(templates) == 0 {
+		return "📝 暂无私信话术模板"
+	}
+
+	lines := []string{fmt.Sprintf("📝 话术模板 (%d条)：", len(templates)), ""}
+	for i, item := range templates {
+		lines = append(lines, fmt.Sprintf("%d. %s", i+1, item))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (s *AdminService) dmRecordsText() string {
+	records := s.recordStore.DMRecords()
+	if len(records) == 0 {
+		return "📨 暂无私信记录"
+	}
+
+	todaySent, todaySuccess, todayFailed := s.dmStatsToday()
+	lines := []string{
+		fmt.Sprintf("📨 私信记录\n\n今日发送: %d | 成功 %d | 失败 %d", todaySent, todaySuccess, todayFailed),
+		"",
+		"最近 10 条：",
+	}
+	start := len(records) - 10
+	if start < 0 {
+		start = 0
+	}
+	for i := len(records) - 1; i >= start; i-- {
+		record := records[i]
+		target := strconv.FormatInt(record.UserID, 10)
+		if strings.TrimSpace(record.Username) != "" {
+			target = "@" + strings.TrimPrefix(record.Username, "@")
+		}
+		senderLabel := record.Sender
+		if strings.TrimSpace(senderLabel) == "" {
+			senderLabel = "-"
+		}
+		line := fmt.Sprintf("• %s | %s | via %s", target, record.Status, senderLabel)
+		if strings.TrimSpace(record.Error) != "" {
+			line += " | " + record.Error
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (s *AdminService) dmSettingsText() string {
+	state := s.settings.Snapshot()
+	return fmt.Sprintf(
+		"⚙️ 私信发送设置\n\n冷却时间: %d 分钟\nDry-run: %t\n当前默认模板:\n%s",
+		state.CooldownMinutes,
+		state.DryRun,
+		state.DMTemplate,
 	)
 }
 
@@ -798,7 +1030,78 @@ func (s *AdminService) dmPoolKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{
+				{Text: "🔌 连接私信号", CallbackData: callbackDMConnect},
+				{Text: "📋 账号列表", CallbackData: callbackDMList},
+			},
+			{
+				{Text: "📝 话术模板", CallbackData: callbackDMTemplates},
+				{Text: "⚙️ 发送设置", CallbackData: callbackDMSettings},
+			},
+			{
+				{Text: "📨 发送记录", CallbackData: callbackDMRecords},
+			},
+			{
 				{Text: "🔙 返回主菜单", CallbackData: callbackMain},
+			},
+		},
+	}
+}
+
+func (s *AdminService) dmAccountsKeyboard() *model.InlineKeyboardMarkup {
+	accounts := s.listDMAccounts()
+	rows := make([][]model.InlineKeyboardButton, 0, len(accounts)+2)
+	for _, account := range accounts {
+		status := "🔴"
+		if account.Online {
+			status = "🟢"
+		}
+		rows = append(rows, []model.InlineKeyboardButton{
+			{Text: status + " " + account.Phone, CallbackData: callbackDMDetailPrefix + account.Phone},
+		})
+	}
+	rows = append(rows,
+		[]model.InlineKeyboardButton{{Text: "🔌 连接私信号", CallbackData: callbackDMConnect}},
+		[]model.InlineKeyboardButton{{Text: "🔙 返回", CallbackData: callbackDMPool}},
+	)
+	return &model.InlineKeyboardMarkup{InlineKeyboard: rows}
+}
+
+func (s *AdminService) dmTemplatesKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{
+				{Text: "➕ 添加话术", CallbackData: callbackDMTemplateAdd},
+				{Text: "➖ 删除话术", CallbackData: callbackDMTemplateRemove},
+			},
+			{
+				{Text: "🔙 返回", CallbackData: callbackDMPool},
+			},
+		},
+	}
+}
+
+func (s *AdminService) dmRecordsKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{
+				{Text: "📤 导出异常号", CallbackData: callbackDMExportFailed},
+			},
+			{
+				{Text: "🔙 返回", CallbackData: callbackDMPool},
+			},
+		},
+	}
+}
+
+func (s *AdminService) dmSettingsKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{
+				{Text: "切换 Dry-run", CallbackData: callbackToggleDryRun},
+				{Text: "设置冷却", CallbackData: callbackSetCooldown},
+			},
+			{
+				{Text: "🔙 返回", CallbackData: callbackDMPool},
 			},
 		},
 	}
@@ -1148,6 +1451,22 @@ func splitInputParts(text string) []string {
 	return result
 }
 
+func splitTemplateParts(text string) []string {
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	parts := strings.Split(text, "---")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	if len(result) > 0 {
+		return result
+	}
+	return splitInputParts(text)
+}
+
 func parseInt64Parts(text string) []int64 {
 	parts := splitInputParts(text)
 	result := make([]int64, 0, len(parts))
@@ -1185,6 +1504,13 @@ func (s *AdminService) listMonitorAccounts() []MonitorAccountInfo {
 	return s.monitorManager.ListMonitorAccounts()
 }
 
+func (s *AdminService) listDMAccounts() []DMAccountInfo {
+	if s.dmManager == nil {
+		return nil
+	}
+	return s.dmManager.ListDMAccounts()
+}
+
 func (s *AdminService) dmStatsToday() (sent, success, failed int) {
 	today := time.Now().Format("2006-01-02")
 	for _, record := range s.recordStore.DMRecords() {
@@ -1200,6 +1526,35 @@ func (s *AdminService) dmStatsToday() (sent, success, failed int) {
 		}
 	}
 	return sent, success, failed
+}
+
+func (s *AdminService) sendFailedDMExport(ctx context.Context, chatID int64) error {
+	records := s.recordStore.DMRecords()
+	failed := make([]model.DMRecord, 0)
+	for _, record := range records {
+		if record.Status == "failed" {
+			failed = append(failed, record)
+		}
+	}
+	if len(failed) == 0 {
+		return fmt.Errorf("没有异常私信记录")
+	}
+
+	lines := make([]string, 0, len(failed))
+	for _, record := range failed {
+		target := strconv.FormatInt(record.UserID, 10)
+		if strings.TrimSpace(record.Username) != "" {
+			target = "@" + strings.TrimPrefix(record.Username, "@")
+		}
+		line := target
+		if strings.TrimSpace(record.Error) != "" {
+			line += " | " + record.Error
+		}
+		lines = append(lines, line)
+	}
+
+	filename := fmt.Sprintf("jtbot_failed_dm_%s.txt", time.Now().Format("20060102_150405"))
+	return s.client.SendDocument(ctx, chatID, filename, []byte(strings.Join(lines, "\n")), fmt.Sprintf("异常私信记录 %d 条", len(failed)))
 }
 
 func (s *AdminService) setPending(userID int64, action pendingAction) {

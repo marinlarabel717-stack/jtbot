@@ -191,6 +191,21 @@ func (c *Client) SendMessage(ctx context.Context, chatID int64, text string, rep
 	return c.sendText(ctx, peer, text)
 }
 
+func (c *Client) SendDirectMessage(ctx context.Context, userID int64, username, text string) error {
+	if c.baseURL != "" {
+		return c.SendMessage(ctx, userID, text, nil)
+	}
+
+	peer, err := c.lookupPeer(userID)
+	if err != nil && strings.TrimSpace(username) != "" {
+		peer, err = c.resolveUsernamePeer(ctx, username)
+	}
+	if err != nil {
+		return err
+	}
+	return c.sendText(ctx, peer, text)
+}
+
 func (c *Client) EditMessageText(ctx context.Context, chatID int64, messageID int64, text string, replyMarkup *model.InlineKeyboardMarkup) error {
 	if c.baseURL != "" {
 		payload := map[string]any{
@@ -292,6 +307,16 @@ func (c *Client) SendDocument(ctx context.Context, chatID int64, filename string
 	return nil
 }
 
+func (c *Client) Label() string {
+	if strings.TrimSpace(c.phone) != "" {
+		return c.phone
+	}
+	if c.baseURL != "" {
+		return "bot_api"
+	}
+	return "telegram"
+}
+
 func (c *Client) handleIncomingMessage(
 	ctx context.Context,
 	entities mtproto.Entities,
@@ -360,10 +385,12 @@ func (c *Client) resolveChat(peer mtproto.PeerClass, entities mtproto.Entities) 
 		return model.Chat{ID: p.ChatID, Type: "group"}
 	case *mtproto.PeerChannel:
 		if channel, exists := entities.Channels[p.ChannelID]; exists {
+			username, _ := channel.GetUsername()
 			return model.Chat{
-				ID:    p.ChannelID,
-				Type:  "channel",
-				Title: channel.Title,
+				ID:       p.ChannelID,
+				Type:     "channel",
+				Title:    channel.Title,
+				Username: username,
 			}
 		}
 		return model.Chat{ID: p.ChannelID, Type: "channel"}
@@ -425,6 +452,78 @@ func (c *Client) cacheEntities(entities mtproto.Entities) {
 			AccessHash: accessHash,
 		}
 	}
+}
+
+func (c *Client) resolveUsernamePeer(ctx context.Context, username string) (mtproto.InputPeerClass, error) {
+	c.mu.RLock()
+	api := c.api
+	c.mu.RUnlock()
+	if api == nil {
+		return nil, errors.New("telegram api is not ready")
+	}
+
+	username = strings.TrimSpace(strings.TrimPrefix(username, "@"))
+	if username == "" {
+		return nil, errors.New("username is empty")
+	}
+
+	result, err := api.ContactsResolveUsername(ctx, &mtproto.ContactsResolveUsernameRequest{
+		Username: username,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	users := result.MapUsers()
+	chats := result.MapChats()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, user := range users {
+		u, ok := user.(*mtproto.User)
+		if !ok || u == nil {
+			continue
+		}
+		accessHash, ok := u.GetAccessHash()
+		if !ok {
+			continue
+		}
+		c.peers[u.ID] = &mtproto.InputPeerUser{
+			UserID:     u.ID,
+			AccessHash: accessHash,
+		}
+	}
+	for _, chat := range chats {
+		switch v := chat.(type) {
+		case *mtproto.Channel:
+			accessHash, ok := v.GetAccessHash()
+			if !ok {
+				continue
+			}
+			c.peers[v.ID] = &mtproto.InputPeerChannel{
+				ChannelID:  v.ID,
+				AccessHash: accessHash,
+			}
+		case *mtproto.Chat:
+			c.peers[v.ID] = &mtproto.InputPeerChat{ChatID: v.ID}
+		}
+	}
+
+	switch peer := result.Peer.(type) {
+	case *mtproto.PeerUser:
+		if resolved, ok := c.peers[peer.UserID]; ok {
+			return resolved, nil
+		}
+	case *mtproto.PeerChannel:
+		if resolved, ok := c.peers[peer.ChannelID]; ok {
+			return resolved, nil
+		}
+	case *mtproto.PeerChat:
+		if resolved, ok := c.peers[peer.ChatID]; ok {
+			return resolved, nil
+		}
+	}
+	return nil, fmt.Errorf("resolved username %s but peer is unavailable", username)
 }
 
 func (c *Client) lookupPeer(id int64) (mtproto.InputPeerClass, error) {

@@ -19,6 +19,8 @@ type Config struct {
 	SessionFile    string
 	SessionsDir    string
 	AccountsFile   string
+	DMSessionsDir  string
+	DMAccountsFile string
 	MonitorChatIDs map[int64]struct{}
 	AlertChatID    int64
 	KeywordsFile   string
@@ -76,6 +78,8 @@ func Load() (Config, error) {
 	sessionFile := getEnv("SESSION_FILE", filepath.Join("data", "session.json"))
 	sessionsDir := getEnv("SESSIONS_DIR", filepath.Join("data", "sessions"))
 	accountsFile := getEnv("MONITOR_ACCOUNTS_FILE", filepath.Join("data", "monitor_accounts.json"))
+	dmSessionsDir := getEnv("DM_SESSIONS_DIR", filepath.Join("data", "dm_sessions"))
+	dmAccountsFile := getEnv("DM_ACCOUNTS_FILE", filepath.Join("data", "dm_accounts.json"))
 	cooldownMinutes := getEnvInt("COOLDOWN_MINUTES", 1440)
 
 	cfg := Config{
@@ -87,6 +91,8 @@ func Load() (Config, error) {
 		SessionFile:    sessionFile,
 		SessionsDir:    sessionsDir,
 		AccountsFile:   accountsFile,
+		DMSessionsDir:  dmSessionsDir,
+		DMAccountsFile: dmAccountsFile,
 		MonitorChatIDs: parseChatIDs(getEnv("MONITOR_CHAT_IDS", os.Getenv("MONITOR_CHAT_ID"))),
 		AlertChatID:    getEnvInt64("ALERT_CHAT_ID", 0),
 		KeywordsFile:   keywordsFile,

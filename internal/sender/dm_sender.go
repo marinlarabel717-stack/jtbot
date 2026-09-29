@@ -11,16 +11,22 @@ import (
 	"github.com/marinlarabel717-stack/jtbot/pkg/tg"
 )
 
+type DMDispatcher interface {
+	SendDM(ctx context.Context, fallback *tg.Client, job model.DMJob, text string) (string, error)
+}
+
 type Sender struct {
 	client      *tg.Client
+	dispatcher  DMDispatcher
 	recordStore *storage.RecordStore
 	settings    *storage.SettingsStore
 	logger      *logx.Logger
 }
 
-func New(client *tg.Client, recordStore *storage.RecordStore, settings *storage.SettingsStore, logger *logx.Logger) *Sender {
+func New(client *tg.Client, dispatcher DMDispatcher, recordStore *storage.RecordStore, settings *storage.SettingsStore, logger *logx.Logger) *Sender {
 	return &Sender{
 		client:      client,
+		dispatcher:  dispatcher,
 		recordStore: recordStore,
 		settings:    settings,
 		logger:      logger,
@@ -53,13 +59,23 @@ func (s *Sender) handleJob(ctx context.Context, job model.DMJob) {
 	}
 
 	if s.settings.IsDryRun() {
+		record.Sender = "dry_run"
 		record.Status = "dry_run"
 		s.recordStore.SaveDMRecord(record)
 		s.logger.Infof("dry-run dm user=%d keywords=%s", job.TargetUserID, strings.Join(job.Keywords, ","))
 		return
 	}
 
-	if err := s.client.SendMessage(ctx, job.TargetUserID, text, nil); err != nil {
+	senderLabel := s.client.Label()
+	var err error
+	if s.dispatcher != nil {
+		senderLabel, err = s.dispatcher.SendDM(ctx, s.client, job, text)
+	} else {
+		err = s.client.SendDirectMessage(ctx, job.TargetUserID, job.Username, text)
+	}
+	record.Sender = senderLabel
+
+	if err != nil {
 		record.Status = "failed"
 		record.Error = err.Error()
 		s.recordStore.SaveDMRecord(record)

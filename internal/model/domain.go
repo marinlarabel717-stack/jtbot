@@ -9,13 +9,14 @@ type Update struct {
 }
 
 type Message struct {
-	MessageID int64    `json:"message_id"`
-	From      *User    `json:"from"`
-	Chat      Chat     `json:"chat"`
-	Text      string   `json:"text"`
-	Caption   string   `json:"caption"`
-	Date      int64    `json:"date"`
-	Entities  []Entity `json:"entities"`
+	MessageID int64     `json:"message_id"`
+	From      *User     `json:"from"`
+	Chat      Chat      `json:"chat"`
+	Text      string    `json:"text"`
+	Caption   string    `json:"caption"`
+	Date      int64     `json:"date"`
+	Entities  []Entity  `json:"entities"`
+	Document  *Document `json:"document,omitempty"`
 }
 
 func (m Message) Content() string {
@@ -62,6 +63,14 @@ type InlineKeyboardMarkup struct {
 type InlineKeyboardButton struct {
 	Text         string `json:"text"`
 	CallbackData string `json:"callback_data,omitempty"`
+	URL          string `json:"url,omitempty"`
+}
+
+type Document struct {
+	FileID   string `json:"file_id"`
+	FileName string `json:"file_name"`
+	MimeType string `json:"mime_type"`
+	FileSize int64  `json:"file_size"`
 }
 
 type MatchRecord struct {
@@ -84,6 +93,7 @@ type DMRecord struct {
 	ChatID   int64     `json:"chat_id"`
 	Keywords []string  `json:"keywords"`
 	Message  string    `json:"message"`
+	Sender   string    `json:"sender,omitempty"`
 	Status   string    `json:"status"`
 	Error    string    `json:"error,omitempty"`
 	SentAt   time.Time `json:"sent_at"`

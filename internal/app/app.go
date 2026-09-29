@@ -25,6 +25,7 @@ import (
 
 type monitorRuntime struct {
 	cancel      context.CancelFunc
+	client      *tg.Client
 	sessionFile string
 	online      bool
 	lastError   string
@@ -44,13 +45,16 @@ type App struct {
 	matcher      *matcher.KeywordMatcher
 	ruleEngine   *rules.Engine
 	accountStore *storage.MonitorAccountStore
+	dmStore      *storage.DMAccountStore
 
 	authCoordinator *tg.AuthCoordinator
 
-	runMu    sync.RWMutex
-	runCtx   context.Context
-	monitors map[string]*monitorRuntime
-	wg       sync.WaitGroup
+	runMu      sync.RWMutex
+	runCtx     context.Context
+	monitors   map[string]*monitorRuntime
+	dmAccounts map[string]*monitorRuntime
+	dmIndex    int
+	wg         sync.WaitGroup
 }
 
 func New() (*App, error) {
@@ -68,6 +72,9 @@ func New() (*App, error) {
 	}
 	if err := os.MkdirAll(cfg.SessionsDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create sessions dir: %w", err)
+	}
+	if err := os.MkdirAll(cfg.DMSessionsDir, 0o755); err != nil {
+		return nil, fmt.Errorf("create dm sessions dir: %w", err)
 	}
 
 	keywordStore := storage.NewKeywordStore(cfg.KeywordsFile)
@@ -107,6 +114,10 @@ func New() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	dmStore, err := storage.NewDMAccountStore(cfg.DMAccountsFile, cfg.DMSessionsDir)
+	if err != nil {
+		return nil, err
+	}
 
 	app := &App{
 		cfg:             cfg,
@@ -118,8 +129,10 @@ func New() (*App, error) {
 		matcher:         matcher.NewKeywordMatcher(),
 		ruleEngine:      rules.NewEngine(settingsStore, recordStore),
 		accountStore:    accountStore,
+		dmStore:         dmStore,
 		authCoordinator: &tg.AuthCoordinator{},
 		monitors:        make(map[string]*monitorRuntime),
+		dmAccounts:      make(map[string]*monitorRuntime),
 	}
 
 	if cfg.BotToken != "" && cfg.AdminUserID != 0 {
@@ -131,6 +144,7 @@ func New() (*App, error) {
 			settingsStore,
 			blacklistStore,
 			app.authCoordinator,
+			app,
 			app,
 			recordStore,
 			logger,
@@ -161,6 +175,9 @@ func (a *App) Run(ctx context.Context) error {
 	if err := a.startInitialMonitors(runCtx); err != nil {
 		return err
 	}
+	if err := a.startInitialDMAccounts(runCtx); err != nil {
+		return err
+	}
 
 	errCh := make(chan error, 1)
 	if a.adminPoller != nil {
@@ -177,11 +194,13 @@ func (a *App) Run(ctx context.Context) error {
 	case <-ctx.Done():
 		cancel()
 		a.stopAllMonitors()
+		a.stopAllDMAccounts()
 		a.wg.Wait()
 		return nil
 	case err := <-errCh:
 		cancel()
 		a.stopAllMonitors()
+		a.stopAllDMAccounts()
 		a.wg.Wait()
 		return err
 	}
@@ -277,6 +296,116 @@ func (a *App) ListMonitorAccounts() []service.MonitorAccountInfo {
 	return result
 }
 
+func (a *App) StartDMLogin(ctx context.Context, phone string) (string, error) {
+	phone = strings.TrimSpace(phone)
+	if phone == "" {
+		return "", errors.New("手机号不能为空")
+	}
+
+	runCtx, err := a.currentRunContext()
+	if err != nil {
+		return "", err
+	}
+
+	account, added, err := a.dmStore.Add(phone)
+	if err != nil {
+		return "", err
+	}
+	if account.Phone == "" {
+		return "", errors.New("手机号不能为空")
+	}
+
+	if !added {
+		if err := a.RestartDMAccount(ctx, account.Phone); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("私信号 %s 已存在，已重新发起登录/重连。", account.Phone), nil
+	}
+
+	if err := a.startDMAccount(runCtx, account); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("已添加私信号 %s，并开始登录流程。收到验证码或两步密码提示后，直接在这里发送即可。", account.Phone), nil
+}
+
+func (a *App) DMCounts() (active int, total int) {
+	accounts := a.dmStore.List()
+
+	a.runMu.RLock()
+	defer a.runMu.RUnlock()
+
+	for _, runtime := range a.dmAccounts {
+		if runtime != nil && runtime.online {
+			active++
+		}
+	}
+	return active, len(accounts)
+}
+
+func (a *App) ListDMAccounts() []service.DMAccountInfo {
+	accounts := a.dmStore.List()
+	result := make([]service.DMAccountInfo, 0, len(accounts))
+
+	a.runMu.RLock()
+	defer a.runMu.RUnlock()
+
+	for _, account := range accounts {
+		info := service.DMAccountInfo{
+			Phone:       account.Phone,
+			SessionFile: account.SessionFile,
+		}
+		if runtime, ok := a.dmAccounts[account.Phone]; ok && runtime != nil {
+			info.Online = runtime.online
+			info.LastError = runtime.lastError
+		}
+		result = append(result, info)
+	}
+	return result
+}
+
+func (a *App) GetDMAccount(phone string) (service.DMAccountInfo, bool) {
+	for _, account := range a.ListDMAccounts() {
+		if account.Phone == strings.TrimSpace(phone) {
+			return account, true
+		}
+	}
+	return service.DMAccountInfo{}, false
+}
+
+func (a *App) RestartDMAccount(ctx context.Context, phone string) error {
+	account, ok := a.dmStore.Get(phone)
+	if !ok {
+		return errors.New("私信号不存在")
+	}
+
+	runCtx, err := a.currentRunContext()
+	if err != nil {
+		return err
+	}
+
+	a.stopDMAccount(phone)
+	return a.startDMAccount(runCtx, account)
+}
+
+func (a *App) DeleteDMAccount(ctx context.Context, phone string) error {
+	account, removed, err := a.dmStore.Remove(phone)
+	if err != nil {
+		return err
+	}
+	if !removed {
+		return errors.New("私信号不存在")
+	}
+
+	a.stopDMAccount(phone)
+
+	if strings.TrimSpace(account.SessionFile) != "" {
+		if err := os.Remove(account.SessionFile); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
 func (a *App) GetMonitorAccount(phone string) (service.MonitorAccountInfo, bool) {
 	for _, account := range a.ListMonitorAccounts() {
 		if account.Phone == strings.TrimSpace(phone) {
@@ -346,6 +475,15 @@ func (a *App) startInitialMonitors(ctx context.Context) error {
 	return nil
 }
 
+func (a *App) startInitialDMAccounts(ctx context.Context) error {
+	for _, account := range a.dmStore.List() {
+		if err := a.startDMAccount(ctx, account); err != nil {
+			a.logger.Errorf("start dm account %s failed: %v", account.Phone, err)
+		}
+	}
+	return nil
+}
+
 func (a *App) startMonitorAccount(ctx context.Context, account storage.MonitorAccount) error {
 	a.runMu.Lock()
 	if existing, exists := a.monitors[account.Phone]; exists && existing != nil && existing.online {
@@ -367,9 +505,14 @@ func (a *App) startMonitorAccount(ctx context.Context, account storage.MonitorAc
 	} else {
 		client = tg.NewClient(a.cfg.AppID, a.cfg.AppHash, account.Phone, account.SessionFile, a.logger)
 	}
+	a.runMu.Lock()
+	if runtime := a.monitors[account.Phone]; runtime != nil {
+		runtime.client = client
+	}
+	a.runMu.Unlock()
 
 	jobQueue := queue.NewMessageQueue(a.cfg.QueueSize)
-	dmSender := sender.New(client, a.recordStore, a.settings, a.logger)
+	dmSender := sender.New(client, a, a.recordStore, a.settings, a.logger)
 	triggerSvc := service.NewTriggerService(
 		a.matcher,
 		a.keywordStore,
@@ -403,6 +546,52 @@ func (a *App) startMonitorAccount(ctx context.Context, account storage.MonitorAc
 			a.clearMonitorError(account.Phone)
 		}
 		a.markMonitorStopped(account.Phone)
+	}()
+
+	return nil
+}
+
+func (a *App) startDMAccount(ctx context.Context, account storage.DMAccount) error {
+	a.runMu.Lock()
+	if existing, exists := a.dmAccounts[account.Phone]; exists && existing != nil && existing.online {
+		a.runMu.Unlock()
+		return nil
+	}
+	dmCtx, cancel := context.WithCancel(ctx)
+	a.dmAccounts[account.Phone] = &monitorRuntime{
+		cancel:      cancel,
+		sessionFile: account.SessionFile,
+		online:      true,
+	}
+	a.runMu.Unlock()
+
+	var client *tg.Client
+	if a.adminBot != nil && a.cfg.AdminUserID != 0 {
+		authFlow := tg.NewAdminAuthWithCoordinator(account.Phone, a.cfg.AdminUserID, a.adminBot, a.authCoordinator, a.logger)
+		client = tg.NewClientWithAuth(a.cfg.AppID, a.cfg.AppHash, account.Phone, account.SessionFile, authFlow, a.logger)
+	} else {
+		client = tg.NewClient(a.cfg.AppID, a.cfg.AppHash, account.Phone, account.SessionFile, a.logger)
+	}
+	a.runMu.Lock()
+	if runtime := a.dmAccounts[account.Phone]; runtime != nil {
+		runtime.client = client
+	}
+	a.runMu.Unlock()
+
+	a.wg.Add(1)
+	go func() {
+		defer a.wg.Done()
+		defer cancel()
+
+		err := client.Run(dmCtx, func(context.Context, model.Update) error { return nil })
+		if err != nil && dmCtx.Err() == nil {
+			a.setDMAccountError(account.Phone, err.Error())
+			a.logger.Errorf("dm account %s stopped: %v", account.Phone, err)
+			a.notifyAdmin(dmCtx, fmt.Sprintf("私信号 %s 启动失败：%v", account.Phone, err))
+		} else {
+			a.clearDMAccountError(account.Phone)
+		}
+		a.markDMAccountStopped(account.Phone)
 	}()
 
 	return nil
@@ -442,10 +631,43 @@ func (a *App) stopAllMonitors() {
 	}
 }
 
+func (a *App) stopDMAccount(phone string) {
+	a.runMu.Lock()
+	runtime := a.dmAccounts[phone]
+	if runtime != nil {
+		runtime.online = false
+	}
+	a.runMu.Unlock()
+	if runtime != nil && runtime.cancel != nil {
+		runtime.cancel()
+	}
+}
+
+func (a *App) stopAllDMAccounts() {
+	a.runMu.RLock()
+	phones := make([]string, 0, len(a.dmAccounts))
+	for phone := range a.dmAccounts {
+		phones = append(phones, phone)
+	}
+	a.runMu.RUnlock()
+
+	for _, phone := range phones {
+		a.stopDMAccount(phone)
+	}
+}
+
 func (a *App) markMonitorStopped(phone string) {
 	a.runMu.Lock()
 	defer a.runMu.Unlock()
 	if runtime, ok := a.monitors[phone]; ok && runtime != nil {
+		runtime.online = false
+	}
+}
+
+func (a *App) markDMAccountStopped(phone string) {
+	a.runMu.Lock()
+	defer a.runMu.Unlock()
+	if runtime, ok := a.dmAccounts[phone]; ok && runtime != nil {
 		runtime.online = false
 	}
 }
@@ -462,12 +684,72 @@ func (a *App) setMonitorError(phone, text string) {
 	runtime.lastError = strings.TrimSpace(text)
 }
 
+func (a *App) setDMAccountError(phone, text string) {
+	a.runMu.Lock()
+	defer a.runMu.Unlock()
+	runtime, ok := a.dmAccounts[phone]
+	if !ok || runtime == nil {
+		runtime = &monitorRuntime{}
+		a.dmAccounts[phone] = runtime
+	}
+	runtime.online = false
+	runtime.lastError = strings.TrimSpace(text)
+}
+
 func (a *App) clearMonitorError(phone string) {
 	a.runMu.Lock()
 	defer a.runMu.Unlock()
 	if runtime, ok := a.monitors[phone]; ok && runtime != nil {
 		runtime.lastError = ""
 	}
+}
+
+func (a *App) clearDMAccountError(phone string) {
+	a.runMu.Lock()
+	defer a.runMu.Unlock()
+	if runtime, ok := a.dmAccounts[phone]; ok && runtime != nil {
+		runtime.lastError = ""
+	}
+}
+
+func (a *App) SendDM(ctx context.Context, fallback *tg.Client, job model.DMJob, text string) (string, error) {
+	a.runMu.Lock()
+	accounts := a.dmStore.List()
+	available := make([]string, 0, len(accounts))
+	for _, account := range accounts {
+		runtime := a.dmAccounts[account.Phone]
+		if runtime != nil && runtime.online {
+			available = append(available, account.Phone)
+		}
+	}
+
+	var selectedPhone string
+	var selectedClient *tg.Client
+	if len(available) > 0 {
+		selectedPhone = available[a.dmIndex%len(available)]
+		a.dmIndex = (a.dmIndex + 1) % len(available)
+		if runtime := a.dmAccounts[selectedPhone]; runtime != nil {
+			selectedClient = runtime.client
+		}
+	}
+	a.runMu.Unlock()
+
+	if selectedPhone != "" && selectedClient != nil {
+		if err := selectedClient.SendDirectMessage(ctx, job.TargetUserID, job.Username, text); err == nil {
+			return selectedPhone, nil
+		}
+	}
+
+	if fallback == nil {
+		if selectedPhone != "" {
+			return selectedPhone, fmt.Errorf("私信号 %s 发送失败，且没有可用回退监控号", selectedPhone)
+		}
+		return "", errors.New("没有可用的私信发送账号")
+	}
+	if err := fallback.SendDirectMessage(ctx, job.TargetUserID, job.Username, text); err != nil {
+		return fallback.Label(), err
+	}
+	return fallback.Label(), nil
 }
 
 func (a *App) notifyAdmin(ctx context.Context, text string) {

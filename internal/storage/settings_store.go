@@ -2,9 +2,11 @@ package storage
 
 import (
 	"encoding/json"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -16,16 +18,17 @@ type SettingsStore struct {
 }
 
 type RuntimeSettings struct {
-	MonitoringEnabled bool    `json:"monitoring_enabled"`
-	MonitorChatIDs    []int64 `json:"monitor_chat_ids"`
-	AlertChatID       int64   `json:"alert_chat_id"`
-	CooldownMinutes   int     `json:"cooldown_minutes"`
-	MaxMessageLength  int     `json:"max_message_length"`
-	FilterNoUsername  bool    `json:"filter_no_username"`
-	FilterNoAvatar    bool    `json:"filter_no_avatar"`
-	MinAccountAgeDays int     `json:"min_account_age_days"`
-	DMTemplate        string  `json:"dm_template"`
-	DryRun            bool    `json:"dry_run"`
+	MonitoringEnabled bool     `json:"monitoring_enabled"`
+	MonitorChatIDs    []int64  `json:"monitor_chat_ids"`
+	AlertChatID       int64    `json:"alert_chat_id"`
+	CooldownMinutes   int      `json:"cooldown_minutes"`
+	MaxMessageLength  int      `json:"max_message_length"`
+	FilterNoUsername  bool     `json:"filter_no_username"`
+	FilterNoAvatar    bool     `json:"filter_no_avatar"`
+	MinAccountAgeDays int      `json:"min_account_age_days"`
+	DMTemplate        string   `json:"dm_template"`
+	DMTemplates       []string `json:"dm_templates"`
+	DryRun            bool     `json:"dry_run"`
 }
 
 func NewSettingsStore(path string, defaults RuntimeSettings) (*SettingsStore, error) {
@@ -98,8 +101,20 @@ func (s *SettingsStore) load() error {
 			s.state.DMTemplate = template
 		}
 	}
+	if value, ok := raw["dm_templates"]; ok {
+		var templates []string
+		if err := json.Unmarshal(value, &templates); err == nil {
+			s.state.DMTemplates = normalizeTemplates(templates)
+		}
+	}
 	if value, ok := raw["dry_run"]; ok {
 		_ = json.Unmarshal(value, &s.state.DryRun)
+	}
+	if len(s.state.DMTemplates) == 0 && strings.TrimSpace(s.state.DMTemplate) != "" {
+		s.state.DMTemplates = []string{s.state.DMTemplate}
+	}
+	if strings.TrimSpace(s.state.DMTemplate) == "" && len(s.state.DMTemplates) > 0 {
+		s.state.DMTemplate = s.state.DMTemplates[0]
 	}
 	return nil
 }
@@ -273,8 +288,107 @@ func (s *SettingsStore) SetMinAccountAgeDays(days int) error {
 func (s *SettingsStore) SetDMTemplate(template string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	template = strings.TrimSpace(template)
 	s.state.DMTemplate = template
+	if template != "" {
+		templates := []string{template}
+		for _, item := range s.state.DMTemplates {
+			item = strings.TrimSpace(item)
+			if item == "" || item == template {
+				continue
+			}
+			templates = append(templates, item)
+		}
+		s.state.DMTemplates = templates
+	}
 	return s.persistLocked()
+}
+
+func (s *SettingsStore) ListDMTemplates() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(s.state.DMTemplates) == 0 && strings.TrimSpace(s.state.DMTemplate) != "" {
+		return []string{s.state.DMTemplate}
+	}
+	return append([]string(nil), s.state.DMTemplates...)
+}
+
+func (s *SettingsStore) AddDMTemplates(templates []string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	existing := make(map[string]struct{}, len(s.state.DMTemplates))
+	for _, item := range s.state.DMTemplates {
+		item = strings.TrimSpace(item)
+		if item != "" {
+			existing[item] = struct{}{}
+		}
+	}
+
+	added := 0
+	for _, item := range normalizeTemplates(templates) {
+		if _, ok := existing[item]; ok {
+			continue
+		}
+		s.state.DMTemplates = append(s.state.DMTemplates, item)
+		existing[item] = struct{}{}
+		added++
+	}
+	if strings.TrimSpace(s.state.DMTemplate) == "" && len(s.state.DMTemplates) > 0 {
+		s.state.DMTemplate = s.state.DMTemplates[0]
+	}
+	if added == 0 {
+		return 0, nil
+	}
+	return added, s.persistLocked()
+}
+
+func (s *SettingsStore) RemoveDMTemplates(templates []string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	toDelete := make(map[string]struct{}, len(templates))
+	for _, item := range normalizeTemplates(templates) {
+		toDelete[item] = struct{}{}
+	}
+
+	filtered := make([]string, 0, len(s.state.DMTemplates))
+	removed := 0
+	for _, item := range s.state.DMTemplates {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if _, ok := toDelete[item]; ok {
+			removed++
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	s.state.DMTemplates = filtered
+	if len(filtered) == 0 {
+		s.state.DMTemplate = ""
+	} else if _, ok := toDelete[s.state.DMTemplate]; ok || strings.TrimSpace(s.state.DMTemplate) == "" {
+		s.state.DMTemplate = filtered[0]
+	}
+	if removed == 0 {
+		return 0, nil
+	}
+	return removed, s.persistLocked()
+}
+
+func (s *SettingsStore) RandomDMTemplate() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	templates := s.state.DMTemplates
+	if len(templates) == 0 && strings.TrimSpace(s.state.DMTemplate) != "" {
+		return s.state.DMTemplate
+	}
+	if len(templates) == 0 {
+		return ""
+	}
+	return templates[rand.Intn(len(templates))]
 }
 
 func (s *SettingsStore) IsDryRun() bool {
@@ -303,6 +417,7 @@ func (s *SettingsStore) persistLocked() error {
 
 func (r RuntimeSettings) clone() RuntimeSettings {
 	r.MonitorChatIDs = append([]int64(nil), r.MonitorChatIDs...)
+	r.DMTemplates = append([]string(nil), r.DMTemplates...)
 	return r
 }
 
@@ -318,5 +433,22 @@ func normalizeChatIDs(ids []int64) []int64 {
 		result = append(result, id)
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
+	return result
+}
+
+func normalizeTemplates(templates []string) []string {
+	result := make([]string, 0, len(templates))
+	seen := make(map[string]struct{}, len(templates))
+	for _, item := range templates {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		result = append(result, item)
+	}
 	return result
 }
