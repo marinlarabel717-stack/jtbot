@@ -18,17 +18,20 @@ type SettingsStore struct {
 }
 
 type RuntimeSettings struct {
-	MonitoringEnabled bool     `json:"monitoring_enabled"`
-	MonitorChatIDs    []int64  `json:"monitor_chat_ids"`
-	AlertChatID       int64    `json:"alert_chat_id"`
-	CooldownMinutes   int      `json:"cooldown_minutes"`
-	MaxMessageLength  int      `json:"max_message_length"`
-	FilterNoUsername  bool     `json:"filter_no_username"`
-	FilterNoAvatar    bool     `json:"filter_no_avatar"`
-	MinAccountAgeDays int      `json:"min_account_age_days"`
-	DMTemplate        string   `json:"dm_template"`
-	DMTemplates       []string `json:"dm_templates"`
-	DryRun            bool     `json:"dry_run"`
+	MonitoringEnabled   bool     `json:"monitoring_enabled"`
+	MonitorChatIDs      []int64  `json:"monitor_chat_ids"`
+	AlertChatID         int64    `json:"alert_chat_id"`
+	CooldownMinutes     int      `json:"cooldown_minutes"`
+	ChatCooldownMinutes int      `json:"chat_cooldown_minutes"`
+	TextCooldownMinutes int      `json:"text_cooldown_minutes"`
+	MinMessageLength    int      `json:"min_message_length"`
+	MaxMessageLength    int      `json:"max_message_length"`
+	FilterNoUsername    bool     `json:"filter_no_username"`
+	FilterNoAvatar      bool     `json:"filter_no_avatar"`
+	MinAccountAgeDays   int      `json:"min_account_age_days"`
+	DMTemplate          string   `json:"dm_template"`
+	DMTemplates         []string `json:"dm_templates"`
+	DryRun              bool     `json:"dry_run"`
 }
 
 func NewSettingsStore(path string, defaults RuntimeSettings) (*SettingsStore, error) {
@@ -75,6 +78,24 @@ func (s *SettingsStore) load() error {
 		var minutes int
 		if err := json.Unmarshal(value, &minutes); err == nil && minutes > 0 {
 			s.state.CooldownMinutes = minutes
+		}
+	}
+	if value, ok := raw["chat_cooldown_minutes"]; ok {
+		var minutes int
+		if err := json.Unmarshal(value, &minutes); err == nil && minutes >= 0 {
+			s.state.ChatCooldownMinutes = minutes
+		}
+	}
+	if value, ok := raw["text_cooldown_minutes"]; ok {
+		var minutes int
+		if err := json.Unmarshal(value, &minutes); err == nil && minutes >= 0 {
+			s.state.TextCooldownMinutes = minutes
+		}
+	}
+	if value, ok := raw["min_message_length"]; ok {
+		var minLength int
+		if err := json.Unmarshal(value, &minLength); err == nil && minLength >= 0 {
+			s.state.MinMessageLength = minLength
 		}
 	}
 	if value, ok := raw["max_message_length"]; ok {
@@ -227,6 +248,32 @@ func (s *SettingsStore) SetCooldownMinutes(minutes int) error {
 	return s.persistLocked()
 }
 
+func (s *SettingsStore) ChatCooldown() time.Duration {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return time.Duration(s.state.ChatCooldownMinutes) * time.Minute
+}
+
+func (s *SettingsStore) SetChatCooldownMinutes(minutes int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.state.ChatCooldownMinutes = minutes
+	return s.persistLocked()
+}
+
+func (s *SettingsStore) TextCooldown() time.Duration {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return time.Duration(s.state.TextCooldownMinutes) * time.Minute
+}
+
+func (s *SettingsStore) SetTextCooldownMinutes(minutes int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.state.TextCooldownMinutes = minutes
+	return s.persistLocked()
+}
+
 func (s *SettingsStore) DMTemplate() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -237,6 +284,19 @@ func (s *SettingsStore) MaxMessageLength() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.state.MaxMessageLength
+}
+
+func (s *SettingsStore) MinMessageLength() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.state.MinMessageLength
+}
+
+func (s *SettingsStore) SetMinMessageLength(length int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.state.MinMessageLength = length
+	return s.persistLocked()
 }
 
 func (s *SettingsStore) SetMaxMessageLength(length int) error {

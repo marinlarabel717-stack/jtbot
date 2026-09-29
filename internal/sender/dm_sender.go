@@ -53,12 +53,13 @@ func (s *Sender) Run(ctx context.Context, jobs <-chan model.DMJob) {
 func (s *Sender) handleJob(ctx context.Context, job model.DMJob) {
 	text := s.renderTemplate(job)
 	record := model.DMRecord{
-		UserID:   job.TargetUserID,
-		Username: job.Username,
-		ChatID:   job.ChatID,
-		Keywords: append([]string(nil), job.Keywords...),
-		Message:  text,
-		SentAt:   time.Now(),
+		UserID:     job.TargetUserID,
+		Username:   job.Username,
+		ChatID:     job.ChatID,
+		Keywords:   append([]string(nil), job.Keywords...),
+		SourceText: job.SourceText,
+		Message:    text,
+		SentAt:     time.Now(),
 	}
 
 	if s.settings.IsDryRun() {

@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/marinlarabel717-stack/jtbot/internal/model"
 	"github.com/marinlarabel717-stack/jtbot/internal/storage"
 )
 
@@ -57,6 +58,15 @@ func (e *Engine) MarkProcessed(chatID, messageID int64) bool {
 	return true
 }
 
-func (e *Engine) CanQueueDM(userID int64) bool {
-	return !e.recordStore.IsUserInCooldown(userID, e.settings.Cooldown())
+func (e *Engine) CanQueueDM(job model.DMJob) bool {
+	if e.recordStore.IsUserInCooldown(job.TargetUserID, e.settings.Cooldown()) {
+		return false
+	}
+	if e.recordStore.IsUserInChatCooldown(job.TargetUserID, job.ChatID, e.settings.ChatCooldown()) {
+		return false
+	}
+	if e.recordStore.IsUserTextInCooldown(job.TargetUserID, job.ChatID, job.SourceText, e.settings.TextCooldown()) {
+		return false
+	}
+	return true
 }

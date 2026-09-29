@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -71,6 +72,54 @@ func (s *RecordStore) IsUserInCooldown(userID int64, cooldown time.Duration) boo
 	return time.Since(lastSent) < cooldown
 }
 
+func (s *RecordStore) IsUserInChatCooldown(userID, chatID int64, cooldown time.Duration) bool {
+	if cooldown <= 0 {
+		return false
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cutoff := time.Now().Add(-cooldown)
+	for i := len(s.state.DMRecords) - 1; i >= 0; i-- {
+		record := s.state.DMRecords[i]
+		if record.SentAt.Before(cutoff) {
+			break
+		}
+		if record.UserID == userID && record.ChatID == chatID && isSuccessfulDM(record.Status) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *RecordStore) IsUserTextInCooldown(userID, chatID int64, sourceText string, cooldown time.Duration) bool {
+	if cooldown <= 0 {
+		return false
+	}
+	_ = chatID
+
+	sourceText = normalizeSourceText(sourceText)
+	if sourceText == "" {
+		return false
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cutoff := time.Now().Add(-cooldown)
+	for i := len(s.state.DMRecords) - 1; i >= 0; i-- {
+		record := s.state.DMRecords[i]
+		if record.SentAt.Before(cutoff) {
+			break
+		}
+		if record.UserID == userID && isSuccessfulDM(record.Status) && normalizeSourceText(record.SourceText) == sourceText {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *RecordStore) MatchRecords() []model.MatchRecord {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -126,4 +175,12 @@ func (s *RecordStore) persist() error {
 		return err
 	}
 	return os.Rename(tmpPath, s.path)
+}
+
+func isSuccessfulDM(status string) bool {
+	return status == "sent" || status == "dry_run"
+}
+
+func normalizeSourceText(text string) string {
+	return strings.TrimSpace(strings.ToLower(text))
 }

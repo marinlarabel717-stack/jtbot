@@ -85,6 +85,9 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 	if maxLength := s.settings.MaxMessageLength(); maxLength > 0 && len([]rune(content)) > maxLength {
 		return nil
 	}
+	if minLength := s.settings.MinMessageLength(); minLength > 0 && len([]rune(content)) < minLength {
+		return nil
+	}
 
 	if s.settings.FilterNoUsername() && strings.TrimSpace(msg.From.Username) == "" {
 		return nil
@@ -144,12 +147,7 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 		}
 	}
 
-	if !s.rules.CanQueueDM(msg.From.ID) {
-		s.logger.Infof("user=%d in cooldown, skip dm", msg.From.ID)
-		return nil
-	}
-
-	return s.queue.Publish(ctx, model.DMJob{
+	job := model.DMJob{
 		TargetUserID: msg.From.ID,
 		TargetLabel:  formatAlertUserLabel(msg.From),
 		Username:     msg.From.Username,
@@ -159,7 +157,13 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 		Keywords:     keywords,
 		SourceText:   content,
 		TriggeredAt:  matchedAt,
-	})
+	}
+	if !s.rules.CanQueueDM(job) {
+		s.logger.Infof("user=%d filtered by dm cooldown rules, skip dm", msg.From.ID)
+		return nil
+	}
+
+	return s.queue.Publish(ctx, job)
 }
 
 func safeUsername(username string) string {

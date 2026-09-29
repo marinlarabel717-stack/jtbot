@@ -51,7 +51,10 @@ const (
 	callbackToggleMonitor       = "admin:rule:toggle_monitor"
 	callbackToggleDryRun        = "admin:rule:toggle_dryrun"
 	callbackSetCooldown         = "admin:rule:set_cooldown"
+	callbackSetChatCooldown     = "admin:rule:set_chat_cooldown"
+	callbackSetTextCooldown     = "admin:rule:set_text_cooldown"
 	callbackSetTemplate         = "admin:rule:set_template"
+	callbackSetMinLength        = "admin:rule:set_min_length"
 	callbackSetMaxLength        = "admin:rule:set_max_length"
 	callbackSetMinAge           = "admin:rule:set_min_age"
 	callbackToggleNoName        = "admin:rule:toggle_no_username"
@@ -71,24 +74,27 @@ const (
 type pendingAction string
 
 const (
-	pendingNone          pendingAction = ""
-	pendingLoginMonitor  pendingAction = "login_monitor"
-	pendingLoginDM       pendingAction = "login_dm"
-	pendingUploadDMSess  pendingAction = "upload_dm_session"
-	pendingAddKeywords   pendingAction = "add_keywords"
-	pendingRemoveKeyword pendingAction = "remove_keywords"
-	pendingSetCooldown   pendingAction = "set_cooldown"
-	pendingSetTemplate   pendingAction = "set_template"
-	pendingAddDMTemplate pendingAction = "add_dm_template"
-	pendingRemoveDMTpl   pendingAction = "remove_dm_template"
-	pendingSetMaxLength  pendingAction = "set_max_length"
-	pendingSetMinAge     pendingAction = "set_min_age"
-	pendingAddChatIDs    pendingAction = "add_chat_ids"
-	pendingRemoveChatIDs pendingAction = "remove_chat_ids"
-	pendingUnblockUsers  pendingAction = "unblock_users"
-	pendingUnblockChats  pendingAction = "unblock_chats"
-	pendingExportTime    pendingAction = "export_time"
-	pendingExportKeyword pendingAction = "export_keyword"
+	pendingNone            pendingAction = ""
+	pendingLoginMonitor    pendingAction = "login_monitor"
+	pendingLoginDM         pendingAction = "login_dm"
+	pendingUploadDMSess    pendingAction = "upload_dm_session"
+	pendingAddKeywords     pendingAction = "add_keywords"
+	pendingRemoveKeyword   pendingAction = "remove_keywords"
+	pendingSetCooldown     pendingAction = "set_cooldown"
+	pendingSetChatCooldown pendingAction = "set_chat_cooldown"
+	pendingSetTextCooldown pendingAction = "set_text_cooldown"
+	pendingSetTemplate     pendingAction = "set_template"
+	pendingAddDMTemplate   pendingAction = "add_dm_template"
+	pendingRemoveDMTpl     pendingAction = "remove_dm_template"
+	pendingSetMinLength    pendingAction = "set_min_length"
+	pendingSetMaxLength    pendingAction = "set_max_length"
+	pendingSetMinAge       pendingAction = "set_min_age"
+	pendingAddChatIDs      pendingAction = "add_chat_ids"
+	pendingRemoveChatIDs   pendingAction = "remove_chat_ids"
+	pendingUnblockUsers    pendingAction = "unblock_users"
+	pendingUnblockChats    pendingAction = "unblock_chats"
+	pendingExportTime      pendingAction = "export_time"
+	pendingExportKeyword   pendingAction = "export_keyword"
 )
 
 type exportFilterType string
@@ -365,12 +371,24 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 		}
 	case callbackSetCooldown:
 		s.setPending(callback.From.ID, pendingSetCooldown)
-		text, keyboard = "发送新的冷却分钟数，比如 1440。", s.rulesKeyboard()
+		text, keyboard = "发送新的同用户重复私信冷却分钟数，比如 1440。", s.rulesKeyboard()
 		alert = "等待你发送冷却分钟数"
+	case callbackSetChatCooldown:
+		s.setPending(callback.From.ID, pendingSetChatCooldown)
+		text, keyboard = "发送同群重复私信冷却分钟数，填 0 表示关闭。", s.rulesKeyboard()
+		alert = "等待你发送同群冷却分钟数"
+	case callbackSetTextCooldown:
+		s.setPending(callback.From.ID, pendingSetTextCooldown)
+		text, keyboard = "发送同内容重复私信冷却分钟数，填 0 表示关闭。", s.rulesKeyboard()
+		alert = "等待你发送同内容冷却分钟数"
 	case callbackSetTemplate:
 		s.setPending(callback.From.ID, pendingSetTemplate)
 		text, keyboard = "发送新的私信模板。可用变量: {username} {chat_title} {keywords} {message}", s.rulesKeyboard()
 		alert = "等待你发送私信模板"
+	case callbackSetMinLength:
+		s.setPending(callback.From.ID, pendingSetMinLength)
+		text, keyboard = "发送最小消息长度，填 0 表示不限制。", s.rulesKeyboard()
+		alert = "等待你发送最小消息长度"
 	case callbackSetMaxLength:
 		s.setPending(callback.From.ID, pendingSetMaxLength)
 		text, keyboard = "发送最大消息长度，填 0 表示不限制。", s.rulesKeyboard()
@@ -541,12 +559,30 @@ func (s *AdminService) handlePendingInput(ctx context.Context, msg *model.Messag
 	case pendingSetCooldown:
 		minutes, err := parseNonNegativeInt(text)
 		if err != nil || minutes <= 0 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "冷却分钟数必须是正整数。", s.rulesKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "同用户重复私信冷却必须是正整数。", s.rulesKeyboard())
 		}
 		if err := s.settings.SetCooldownMinutes(minutes); err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, "冷却时间已更新。\n\n"+s.rulesText(), s.rulesKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, "同用户重复私信冷却已更新。\n\n"+s.rulesText(), s.rulesKeyboard())
+	case pendingSetChatCooldown:
+		minutes, err := parseNonNegativeInt(text)
+		if err != nil || minutes < 0 {
+			return s.client.SendMessage(ctx, msg.Chat.ID, "同群重复私信冷却必须是非负整数。", s.rulesKeyboard())
+		}
+		if err := s.settings.SetChatCooldownMinutes(minutes); err != nil {
+			return err
+		}
+		return s.client.SendMessage(ctx, msg.Chat.ID, "同群重复私信冷却已更新。\n\n"+s.rulesText(), s.rulesKeyboard())
+	case pendingSetTextCooldown:
+		minutes, err := parseNonNegativeInt(text)
+		if err != nil || minutes < 0 {
+			return s.client.SendMessage(ctx, msg.Chat.ID, "同内容重复私信冷却必须是非负整数。", s.rulesKeyboard())
+		}
+		if err := s.settings.SetTextCooldownMinutes(minutes); err != nil {
+			return err
+		}
+		return s.client.SendMessage(ctx, msg.Chat.ID, "同内容重复私信冷却已更新。\n\n"+s.rulesText(), s.rulesKeyboard())
 	case pendingSetTemplate:
 		if strings.TrimSpace(text) == "" {
 			return s.client.SendMessage(ctx, msg.Chat.ID, "模板不能为空。", s.rulesKeyboard())
@@ -583,6 +619,15 @@ func (s *AdminService) handlePendingInput(ctx context.Context, msg *model.Messag
 			return err
 		}
 		return s.client.SendMessage(ctx, msg.Chat.ID, "最大消息长度已更新。\n\n"+s.rulesText(), s.rulesKeyboard())
+	case pendingSetMinLength:
+		minLength, err := parseNonNegativeInt(text)
+		if err != nil || minLength < 0 {
+			return s.client.SendMessage(ctx, msg.Chat.ID, "最小消息长度必须是非负整数。", s.rulesKeyboard())
+		}
+		if err := s.settings.SetMinMessageLength(minLength); err != nil {
+			return err
+		}
+		return s.client.SendMessage(ctx, msg.Chat.ID, "最小消息长度已更新。\n\n"+s.rulesText(), s.rulesKeyboard())
 	case pendingSetMinAge:
 		days, err := parseNonNegativeInt(text)
 		if err != nil || days < 0 {
@@ -927,7 +972,7 @@ func (s *AdminService) exportKeywordPrompt() string {
 	return "🔑 按关键词导出\n\n当前关键词：\n" + strings.Join(keywords, " | ") + "\n\n请输入要导出的关键词，多个用 | 分隔。"
 }
 
-func (s *AdminService) rulesText() string {
+func (s *AdminService) legacyRulesText() string {
 	state := s.settings.Snapshot()
 	alertChat := "未设置"
 	if state.AlertChatID != 0 {
@@ -943,6 +988,29 @@ func (s *AdminService) rulesText() string {
 		onOff(state.FilterNoUsername),
 		onOff(state.FilterNoAvatar),
 		formatOptionalNumber(state.MinAccountAgeDays, "不限"),
+		state.DMTemplate,
+	)
+}
+
+func (s *AdminService) rulesText() string {
+	state := s.settings.Snapshot()
+	alertChat := "未设置"
+	if state.AlertChatID != 0 {
+		alertChat = strconv.FormatInt(state.AlertChatID, 10)
+	}
+	return fmt.Sprintf(
+		"⚙️ 过滤设置\n\n监控开关: %s\n同用户重复私信冷却: %d 分钟\n同群重复私信冷却: %s 分钟\n同内容重复私信冷却: %s 分钟\nDry-run: %t\n通知群: %s\n最小消息长度: %s\n最大消息长度: %s\n过滤无用户名: %s\n过滤无头像: %s\n最小账号年龄: %s 天\n私信模板:\n%s",
+		onOff(state.MonitoringEnabled),
+		state.CooldownMinutes,
+		formatOptionalNumber(state.ChatCooldownMinutes, "关闭"),
+		formatOptionalNumber(state.TextCooldownMinutes, "关闭"),
+		state.DryRun,
+		alertChat,
+		formatOptionalNumber(state.MinMessageLength, "不限制"),
+		formatOptionalNumber(state.MaxMessageLength, "不限制"),
+		onOff(state.FilterNoUsername),
+		onOff(state.FilterNoAvatar),
+		formatOptionalNumber(state.MinAccountAgeDays, "不限制"),
 		state.DMTemplate,
 	)
 }
@@ -1207,13 +1275,29 @@ func (s *AdminService) cancelExportKeyboard() *model.InlineKeyboardMarkup {
 	}
 }
 
-func (s *AdminService) rulesKeyboard() *model.InlineKeyboardMarkup {
+func (s *AdminService) legacyRulesKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{{Text: "开关监控", CallbackData: callbackToggleMonitor}, {Text: "切换 Dry-run", CallbackData: callbackToggleDryRun}},
 			{{Text: "设置冷却", CallbackData: callbackSetCooldown}, {Text: "设置模板", CallbackData: callbackSetTemplate}},
 			{{Text: "最大消息长度", CallbackData: callbackSetMaxLength}, {Text: "最小账号年龄", CallbackData: callbackSetMinAge}},
 			{{Text: "过滤无用户名", CallbackData: callbackToggleNoName}, {Text: "过滤无头像", CallbackData: callbackToggleNoPhoto}},
+			{{Text: "监听群配置", CallbackData: callbackChats}, {Text: "黑名单", CallbackData: callbackBlacklist}},
+			{{Text: "当前聊天设为通知群", CallbackData: callbackSetAlertChat}},
+			{{Text: "🔙 返回主菜单", CallbackData: callbackMain}},
+		},
+	}
+}
+
+func (s *AdminService) rulesKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{{Text: "开关监控", CallbackData: callbackToggleMonitor}, {Text: "切换 Dry-run", CallbackData: callbackToggleDryRun}},
+			{{Text: "同用户冷却", CallbackData: callbackSetCooldown}, {Text: "同群冷却", CallbackData: callbackSetChatCooldown}},
+			{{Text: "同内容冷却", CallbackData: callbackSetTextCooldown}, {Text: "设置模板", CallbackData: callbackSetTemplate}},
+			{{Text: "最小消息长度", CallbackData: callbackSetMinLength}, {Text: "最大消息长度", CallbackData: callbackSetMaxLength}},
+			{{Text: "最小账号年龄", CallbackData: callbackSetMinAge}, {Text: "过滤无用户名", CallbackData: callbackToggleNoName}},
+			{{Text: "过滤无头像", CallbackData: callbackToggleNoPhoto}},
 			{{Text: "监听群配置", CallbackData: callbackChats}, {Text: "黑名单", CallbackData: callbackBlacklist}},
 			{{Text: "当前聊天设为通知群", CallbackData: callbackSetAlertChat}},
 			{{Text: "🔙 返回主菜单", CallbackData: callbackMain}},

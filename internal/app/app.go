@@ -95,16 +95,19 @@ func New() (*App, error) {
 	}
 
 	settingsStore, err := storage.NewSettingsStore(cfg.SettingsFile, storage.RuntimeSettings{
-		MonitoringEnabled: true,
-		MonitorChatIDs:    mapKeys(cfg.MonitorChatIDs),
-		AlertChatID:       cfg.AlertChatID,
-		CooldownMinutes:   int(cfg.Cooldown / time.Minute),
-		MaxMessageLength:  100,
-		FilterNoUsername:  true,
-		FilterNoAvatar:    false,
-		MinAccountAgeDays: 7,
-		DMTemplate:        cfg.DMTemplate,
-		DryRun:            cfg.DryRun,
+		MonitoringEnabled:   true,
+		MonitorChatIDs:      mapKeys(cfg.MonitorChatIDs),
+		AlertChatID:         cfg.AlertChatID,
+		CooldownMinutes:     int(cfg.Cooldown / time.Minute),
+		ChatCooldownMinutes: int(cfg.Cooldown / time.Minute),
+		TextCooldownMinutes: int(cfg.Cooldown / time.Minute),
+		MinMessageLength:    2,
+		MaxMessageLength:    100,
+		FilterNoUsername:    true,
+		FilterNoAvatar:      false,
+		MinAccountAgeDays:   7,
+		DMTemplate:          cfg.DMTemplate,
+		DryRun:              cfg.DryRun,
 	})
 	if err != nil {
 		return nil, err

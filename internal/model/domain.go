@@ -141,15 +141,16 @@ type MatchRecord struct {
 }
 
 type DMRecord struct {
-	UserID   int64     `json:"user_id"`
-	Username string    `json:"username"`
-	ChatID   int64     `json:"chat_id"`
-	Keywords []string  `json:"keywords"`
-	Message  string    `json:"message"`
-	Sender   string    `json:"sender,omitempty"`
-	Status   string    `json:"status"`
-	Error    string    `json:"error,omitempty"`
-	SentAt   time.Time `json:"sent_at"`
+	UserID     int64     `json:"user_id"`
+	Username   string    `json:"username"`
+	ChatID     int64     `json:"chat_id"`
+	Keywords   []string  `json:"keywords"`
+	SourceText string    `json:"source_text,omitempty"`
+	Message    string    `json:"message"`
+	Sender     string    `json:"sender,omitempty"`
+	Status     string    `json:"status"`
+	Error      string    `json:"error,omitempty"`
+	SentAt     time.Time `json:"sent_at"`
 }
 
 type DMJob struct {

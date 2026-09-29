@@ -127,6 +127,40 @@ func TestTriggerServiceSkipsLongMessageWhenEnabled(t *testing.T) {
 	}
 }
 
+func TestTriggerServiceSkipsShortMessageWhenEnabled(t *testing.T) {
+	t.Parallel()
+
+	svc, recordStore, _ := newTriggerTestService(t, storage.RuntimeSettings{
+		MonitoringEnabled: true,
+		MonitorChatIDs:    []int64{-100123},
+		CooldownMinutes:   60,
+		MinMessageLength:  10,
+		DMTemplate:        "hi",
+	})
+
+	err := svc.HandleUpdate(context.Background(), model.Update{
+		UpdateID: 1,
+		Message: &model.Message{
+			MessageID: 99,
+			From: &model.User{
+				ID:       777,
+				Username: "target_user",
+			},
+			Chat: model.Chat{
+				ID:    -100123,
+				Title: "test-group",
+			},
+			Text: "合作",
+		},
+	})
+	if err != nil {
+		t.Fatalf("handle update: %v", err)
+	}
+	if got := len(recordStore.MatchRecords()); got != 0 {
+		t.Fatalf("expected 0 match records, got %d", got)
+	}
+}
+
 func TestTriggerServiceFormatsAlertText(t *testing.T) {
 	t.Parallel()
 
