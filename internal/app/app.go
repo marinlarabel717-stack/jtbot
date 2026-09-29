@@ -20,6 +20,7 @@ import (
 	"github.com/marinlarabel717-stack/jtbot/internal/sender"
 	"github.com/marinlarabel717-stack/jtbot/internal/service"
 	"github.com/marinlarabel717-stack/jtbot/internal/storage"
+	"github.com/marinlarabel717-stack/jtbot/internal/version"
 	"github.com/marinlarabel717-stack/jtbot/pkg/tg"
 )
 
@@ -187,7 +188,7 @@ func New() (*App, error) {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	a.logger.Infof("jtbot user session version started")
+	a.logger.Infof("jtbot %s started", version.Current)
 	if a.adminPoller != nil {
 		a.logger.Infof("admin bot backend enabled")
 	}
