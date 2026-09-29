@@ -25,6 +25,7 @@ type TriggerService struct {
 	alertClient  *tg.Client
 	settings     *storage.SettingsStore
 	blacklist    *storage.BlacklistStore
+	monitorLabel string
 	logger       *logx.Logger
 }
 
@@ -38,6 +39,7 @@ func NewTriggerService(
 	alertClient *tg.Client,
 	settings *storage.SettingsStore,
 	blacklist *storage.BlacklistStore,
+	monitorLabel string,
 	logger *logx.Logger,
 ) *TriggerService {
 	return &TriggerService{
@@ -50,6 +52,7 @@ func NewTriggerService(
 		alertClient:  alertClient,
 		settings:     settings,
 		blacklist:    blacklist,
+		monitorLabel: monitorLabel,
 		logger:       logger,
 	}
 }
@@ -117,18 +120,19 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 			ChatTitle: chatTitle,
 			Keyword:   keyword,
 			Message:   content,
-			Monitor:   "user_session",
+			Monitor:   s.monitorLabel,
 			MatchedAt: time.Now(),
 			UpdateID:  update.UpdateID,
 			MessageID: msg.MessageID,
 		})
 	}
 
-	s.logger.Infof("matched user=%d chat=%d keywords=%s", msg.From.ID, msg.Chat.ID, strings.Join(keywords, ","))
+	s.logger.Infof("matched monitor=%s user=%d chat=%d keywords=%s", s.monitorLabel, msg.From.ID, msg.Chat.ID, strings.Join(keywords, ","))
 
 	if alertChatID := s.settings.AlertChatID(); alertChatID != 0 {
 		alertText := fmt.Sprintf(
-			"关键词命中\n群: %s\n用户: %s (%d)\n关键词: %s\n消息: %s",
+			"关键词命中\n监控号: %s\n群: %s\n用户: %s (%d)\n关键词: %s\n消息: %s",
+			s.monitorLabel,
 			chatTitle,
 			formatUserLabel(msg.From),
 			msg.From.ID,

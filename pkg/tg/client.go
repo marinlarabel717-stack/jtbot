@@ -113,8 +113,10 @@ func (c *Client) Run(ctx context.Context, handler func(context.Context, model.Up
 
 	return client.Run(ctx, func(ctx context.Context) error {
 		if err := client.Auth().IfNecessary(ctx, flow); err != nil {
+			completeAuthFlow(c.authFlow)
 			return fmt.Errorf("auth: %w", err)
 		}
+		completeAuthFlow(c.authFlow)
 
 		self, err := client.Self(ctx)
 		if err != nil {
@@ -463,6 +465,15 @@ func promptTerminal(label string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(value), nil
+}
+
+func completeAuthFlow(authFlow auth.UserAuthenticator) {
+	type completer interface {
+		Complete()
+	}
+	if c, ok := authFlow.(completer); ok {
+		c.Complete()
+	}
 }
 
 type apiResponse[T any] struct {

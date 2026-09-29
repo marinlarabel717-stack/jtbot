@@ -30,18 +30,27 @@ type AdminAuth struct {
 	phone       string
 	adminUserID int64
 	client      *Client
+	coordinator *AuthCoordinator
 	logger      *logx.Logger
 
 	mu      sync.Mutex
 	pending *pendingAuthRequest
+	done    chan struct{}
+	once    sync.Once
 }
 
 func NewAdminAuth(phone string, adminUserID int64, client *Client, logger *logx.Logger) *AdminAuth {
+	return NewAdminAuthWithCoordinator(phone, adminUserID, client, nil, logger)
+}
+
+func NewAdminAuthWithCoordinator(phone string, adminUserID int64, client *Client, coordinator *AuthCoordinator, logger *logx.Logger) *AdminAuth {
 	return &AdminAuth{
 		phone:       phone,
 		adminUserID: adminUserID,
 		client:      client,
+		coordinator: coordinator,
 		logger:      logger,
+		done:        make(chan struct{}),
 	}
 }
 
@@ -93,6 +102,11 @@ func (a *AdminAuth) request(ctx context.Context, kind pendingAuthKind, prompt st
 	if a.client == nil || a.adminUserID == 0 {
 		return "", errors.New("admin auth backend is not configured")
 	}
+	if a.coordinator != nil {
+		if err := a.coordinator.activate(a); err != nil {
+			return "", err
+		}
+	}
 
 	req := &pendingAuthRequest{
 		kind: kind,
@@ -126,5 +140,51 @@ func (a *AdminAuth) clearPending(req *pendingAuthRequest) {
 	defer a.mu.Unlock()
 	if a.pending == req {
 		a.pending = nil
+	}
+}
+
+func (a *AdminAuth) Complete() {
+	if a.coordinator != nil {
+		a.coordinator.deactivate(a)
+	}
+	a.once.Do(func() {
+		close(a.done)
+	})
+}
+
+func (a *AdminAuth) Done() <-chan struct{} {
+	return a.done
+}
+
+type AuthCoordinator struct {
+	mu      sync.RWMutex
+	current *AdminAuth
+}
+
+func (c *AuthCoordinator) Submit(text string) (bool, string) {
+	c.mu.RLock()
+	current := c.current
+	c.mu.RUnlock()
+	if current == nil {
+		return false, ""
+	}
+	return current.Submit(text)
+}
+
+func (c *AuthCoordinator) activate(auth *AdminAuth) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.current != nil && c.current != auth {
+		return errors.New("已有监控号正在等待验证码或密码，请先完成当前登录")
+	}
+	c.current = auth
+	return nil
+}
+
+func (c *AuthCoordinator) deactivate(auth *AdminAuth) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.current == auth {
+		c.current = nil
 	}
 }

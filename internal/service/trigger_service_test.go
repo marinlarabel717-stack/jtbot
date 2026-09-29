@@ -156,5 +156,5 @@ func newTriggerTestService(t *testing.T, defaults storage.RuntimeSettings) (*Tri
 	m := matcher.NewKeywordMatcher()
 	ruleEngine := rules.NewEngine(settingsStore, recordStore)
 
-	return NewTriggerService(m, keywordStore, ruleEngine, jobQueue, recordStore, client, nil, settingsStore, blacklistStore, logx.New("debug")), recordStore, blacklistStore
+	return NewTriggerService(m, keywordStore, ruleEngine, jobQueue, recordStore, client, nil, settingsStore, blacklistStore, "test-monitor", logx.New("debug")), recordStore, blacklistStore
 }

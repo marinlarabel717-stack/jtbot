@@ -274,6 +274,25 @@ func newAdminTestServiceWithAuth(t *testing.T, client *tg.Client, authInput *tg.
 		t.Fatalf("new blacklist: %v", err)
 	}
 
-	admin := NewAdminService(123, client, keywordStore, settingsStore, blacklistStore, authInput, logx.New("debug"))
+	var submitter AuthSubmitter
+	if authInput != nil {
+		submitter = authInput
+	}
+
+	admin := NewAdminService(123, client, keywordStore, settingsStore, blacklistStore, submitter, adminTestMonitorManager{}, logx.New("debug"))
 	return admin, settingsStore, blacklistStore
+}
+
+type adminTestMonitorManager struct{}
+
+func (adminTestMonitorManager) StartMonitorLogin(context.Context, string) (string, error) {
+	return "ok", nil
+}
+
+func (adminTestMonitorManager) MonitorSummary() string {
+	return "monitor summary"
+}
+
+func (adminTestMonitorManager) MonitorCounts() (int, int) {
+	return 1, 1
 }
