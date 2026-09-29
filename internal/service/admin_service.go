@@ -258,7 +258,7 @@ func (s *AdminService) handleMessage(ctx context.Context, msg *model.Message) (b
 	action := s.getPending(msg.From.ID)
 	if action == pendingUploadDMSess {
 		if msg.Document == nil {
-			return true, s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¨Ã‚Â¯Ã‚Â·ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚Â `.session` ÃƒÂ¦Ã‹â€ Ã¢â‚¬â€œ `.zip` ÃƒÂ¦Ã¢â‚¬â€œÃ¢â‚¬Â¡ÃƒÂ¤Ã‚Â»Ã‚Â¶ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.dmPoolKeyboard())
+			return true, s.client.SendMessage(ctx, msg.Chat.ID, "è¯·å‘é€ `.session` æˆ– `.zip` æ–‡ä»¶ã€‚", s.dmPoolKeyboard())
 		}
 		err := s.handlePendingDMUpload(ctx, msg)
 		if err == nil {
@@ -273,14 +273,14 @@ func (s *AdminService) handleMessage(ctx context.Context, msg *model.Message) (b
 		s.clearPending(msg.From.ID)
 		return true, s.client.SendMessage(ctx, msg.Chat.ID, s.mainText(), s.mainKeyboard())
 	case "/chatid":
-		return true, s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("ÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ¨Ã‚ÂÃ…Â ÃƒÂ¥Ã‚Â¤Ã‚Â© ID: %d", msg.Chat.ID), nil)
+		return true, s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("å½“å‰èŠå¤© ID: %d", msg.Chat.ID), nil)
 	}
 
 	if s.authInput != nil && !strings.HasPrefix(text, "/") {
 		if handled, kind := s.authInput.Submit(text); handled {
-			ack := "ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã¢â‚¬ÂÃ‚Â¶ÃƒÂ¥Ã‹â€ Ã‚Â°ÃƒÂ§Ã¢â€žÂ¢Ã‚Â»ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢ÃƒÂ©Ã‚ÂªÃ…â€™ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ§Ã‚Â Ã‚ÂÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¦Ã‚Â­Ã‚Â£ÃƒÂ¥Ã…â€œÃ‚Â¨ÃƒÂ§Ã‚Â»Ã‚Â§ÃƒÂ§Ã‚Â»Ã‚Â­ÃƒÂ§Ã¢â€žÂ¢Ã‚Â»ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡"
+			ack := "å·²æ”¶åˆ°ç™»å½•éªŒè¯ç ï¼Œæ­£åœ¨ç»§ç»­ç™»å½•ã€‚"
 			if kind == "password" {
-				ack = "ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã¢â‚¬ÂÃ‚Â¶ÃƒÂ¥Ã‹â€ Ã‚Â°ÃƒÂ¤Ã‚Â¸Ã‚Â¤ÃƒÂ¦Ã‚Â­Ã‚Â¥ÃƒÂ©Ã‚ÂªÃ…â€™ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¥Ã‚Â¯Ã¢â‚¬Â ÃƒÂ§Ã‚Â Ã‚ÂÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¦Ã‚Â­Ã‚Â£ÃƒÂ¥Ã…â€œÃ‚Â¨ÃƒÂ§Ã‚Â»Ã‚Â§ÃƒÂ§Ã‚Â»Ã‚Â­ÃƒÂ§Ã¢â€žÂ¢Ã‚Â»ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡"
+				ack = "å·²æ”¶åˆ°ä¸¤æ­¥éªŒè¯å¯†ç ï¼Œæ­£åœ¨ç»§ç»­ç™»å½•ã€‚"
 			}
 			return true, s.client.SendMessage(ctx, msg.Chat.ID, ack, nil)
 		}
@@ -299,7 +299,7 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 		return false, nil
 	}
 	if callback.Message == nil {
-		return true, s.client.AnswerCallbackQuery(ctx, callback.ID, "ÃƒÂ¦Ã‚Â²Ã‚Â¡ÃƒÂ¦Ã…â€œÃ¢â‚¬Â°ÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ¤Ã‚Â¸Ã…Â ÃƒÂ¤Ã‚Â¸Ã¢â‚¬Â¹ÃƒÂ¦Ã¢â‚¬â€œÃ¢â‚¬Â¡")
+		return true, s.client.AnswerCallbackQuery(ctx, callback.ID, "æ²¡æœ‰æ¶ˆæ¯ä¸Šä¸‹æ–‡")
 	}
 
 	var (
@@ -317,33 +317,33 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 	case callbackAccountAdd:
 		s.setPending(callback.From.ID, pendingLoginMonitor)
 		text, keyboard = s.accountAddPrompt(), s.backToAccountsKeyboard()
-		alert = "ÃƒÂ¦Ã…Â Ã…Â ÃƒÂ¦Ã¢â‚¬Â°Ã¢â‚¬Â¹ÃƒÂ¦Ã…â€œÃ‚ÂºÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ§Ã¢â‚¬ÂºÃ‚Â´ÃƒÂ¦Ã…Â½Ã‚Â¥ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ§Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¦Ã‹â€ Ã¢â‚¬Ëœ"
+		alert = "æŠŠæ‰‹æœºå·ç›´æŽ¥å‘ç»™æˆ‘"
 	case callbackAccountList:
 		text, keyboard = s.accountsListText(), s.accountsListKeyboard()
 	case callbackKeywords:
 		text, keyboard = s.keywordsText(), s.keywordsKeyboard()
 	case callbackKeywordAdd:
 		s.setPending(callback.From.ID, pendingAddKeywordsFuzzy)
-		text, keyboard = "ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¨Ã‚Â¦Ã‚ÂÃƒÂ¦Ã‚Â·Ã‚Â»ÃƒÂ¥Ã…Â Ã‚Â ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ§Ã‚Â³Ã…Â ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã‚Â¤Ã…Â¡ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ | ÃƒÂ¦Ã‹â€ Ã¢â‚¬â€œÃƒÂ¦Ã‚ÂÃ‚Â¢ÃƒÂ¨Ã‚Â¡Ã…â€™ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã…Â¡Ã¢â‚¬ÂÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\nÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ§Ã‚Â³Ã…Â ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¯Ã‚Â¼Ã…Â¡ÃƒÂ¤Ã‚Â¸Ã¢â€šÂ¬ÃƒÂ¥Ã‚ÂÃ‚Â¥ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ©Ã¢â‚¬Â¡Ã…â€™ÃƒÂ¥Ã‚ÂÃ‚ÂªÃƒÂ¨Ã‚Â¦Ã‚ÂÃƒÂ¥Ã…â€™Ã¢â‚¬Â¦ÃƒÂ¥Ã‚ÂÃ‚Â«ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¥Ã‚Â°Ã‚Â±ÃƒÂ¥Ã¢â‚¬ËœÃ‚Â½ÃƒÂ¤Ã‚Â¸Ã‚Â­ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.keywordsKeyboard()
-		alert = "ÃƒÂ§Ã‚Â­Ã¢â‚¬Â°ÃƒÂ¥Ã‚Â¾Ã¢â‚¬Â¦ÃƒÂ¤Ã‚Â½Ã‚Â ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ§Ã‚Â³Ã…Â ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚Â"
+		text, keyboard = "å‘é€è¦æ·»åŠ çš„æ¨¡ç³Šå…³é”®è¯ï¼Œå¤šä¸ªç”¨ | æˆ–æ¢è¡Œåˆ†éš”ã€‚\n\næ¨¡ç³Šå…³é”®è¯ï¼šä¸€å¥è¯é‡Œåªè¦åŒ…å«å…³é”®è¯å°±å‘½ä¸­ã€‚", s.keywordsKeyboard()
+		alert = "ç­‰å¾…ä½ å‘é€æ¨¡ç³Šå…³é”®è¯"
 	case callbackKeywordAdd + ":exact":
 		s.setPending(callback.From.ID, pendingAddKeywordsExact)
-		text, keyboard = "ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¨Ã‚Â¦Ã‚ÂÃƒÂ¦Ã‚Â·Ã‚Â»ÃƒÂ¥Ã…Â Ã‚Â ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ§Ã‚Â²Ã‚Â¾ÃƒÂ¥Ã¢â‚¬Â¡Ã¢â‚¬Â ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã‚Â¤Ã…Â¡ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ | ÃƒÂ¦Ã‹â€ Ã¢â‚¬â€œÃƒÂ¦Ã‚ÂÃ‚Â¢ÃƒÂ¨Ã‚Â¡Ã…â€™ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã…Â¡Ã¢â‚¬ÂÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\nÃƒÂ§Ã‚Â²Ã‚Â¾ÃƒÂ¥Ã¢â‚¬Â¡Ã¢â‚¬Â ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¯Ã‚Â¼Ã…Â¡ÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ¥Ã¢â‚¬Â Ã¢â‚¬Â¦ÃƒÂ¥Ã‚Â®Ã‚Â¹ÃƒÂ¥Ã‚Â¿Ã¢â‚¬Â¦ÃƒÂ©Ã‚Â¡Ã‚Â»ÃƒÂ¤Ã‚Â¸Ã…Â½ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¥Ã‚Â®Ã…â€™ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â¨ÃƒÂ¤Ã‚Â¸Ã¢â€šÂ¬ÃƒÂ¨Ã¢â‚¬Â¡Ã‚Â´ÃƒÂ¦Ã¢â‚¬Â°Ã‚ÂÃƒÂ¥Ã¢â‚¬ËœÃ‚Â½ÃƒÂ¤Ã‚Â¸Ã‚Â­ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.keywordsKeyboard()
-		alert = "ÃƒÂ§Ã‚Â­Ã¢â‚¬Â°ÃƒÂ¥Ã‚Â¾Ã¢â‚¬Â¦ÃƒÂ¤Ã‚Â½Ã‚Â ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ§Ã‚Â²Ã‚Â¾ÃƒÂ¥Ã¢â‚¬Â¡Ã¢â‚¬Â ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚Â"
+		text, keyboard = "å‘é€è¦æ·»åŠ çš„ç²¾å‡†å…³é”®è¯ï¼Œå¤šä¸ªç”¨ | æˆ–æ¢è¡Œåˆ†éš”ã€‚\n\nç²¾å‡†å…³é”®è¯ï¼šæ¶ˆæ¯å†…å®¹å¿…é¡»ä¸Žå…³é”®è¯å®Œå…¨ä¸€è‡´æ‰å‘½ä¸­ã€‚", s.keywordsKeyboard()
+		alert = "ç­‰å¾…ä½ å‘é€ç²¾å‡†å…³é”®è¯"
 	case callbackKeywordRemove:
 		s.setPending(callback.From.ID, pendingRemoveKeyword)
-		text, keyboard = "ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¨Ã‚Â¦Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã‚Â¤Ã…Â¡ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ | ÃƒÂ¦Ã‹â€ Ã¢â‚¬â€œÃƒÂ¦Ã‚ÂÃ‚Â¢ÃƒÂ¨Ã‚Â¡Ã…â€™ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã…Â¡Ã¢â‚¬ÂÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\nÃƒÂ¦Ã¢â‚¬ÂÃ‚Â¯ÃƒÂ¦Ã…â€™Ã‚ÂÃƒÂ¯Ã‚Â¼Ã…Â¡\nÃƒÂ§Ã‚Â²Ã‚Â¾ÃƒÂ¥Ã¢â‚¬Â¡Ã¢â‚¬Â :ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚Â\nÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ§Ã‚Â³Ã…Â :ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚Â\nÃƒÂ¦Ã‹â€ Ã¢â‚¬â€œÃƒÂ§Ã¢â‚¬ÂºÃ‚Â´ÃƒÂ¦Ã…Â½Ã‚Â¥ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¦Ã¢â‚¬â€œÃ¢â‚¬Â¡ÃƒÂ¦Ã…â€œÃ‚Â¬ÃƒÂ¯Ã‚Â¼Ã‹â€ ÃƒÂ¤Ã‚Â¼Ã…Â¡ÃƒÂ¥Ã‹â€ Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤ÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ§Ã‚Â²Ã‚Â¾ÃƒÂ¥Ã¢â‚¬Â¡Ã¢â‚¬Â /ÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ§Ã‚Â³Ã…Â ÃƒÂ¨Ã‚Â§Ã¢â‚¬Å¾ÃƒÂ¥Ã‹â€ Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¼Ã¢â‚¬Â°ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.keywordsKeyboard()
-		alert = "ÃƒÂ§Ã‚Â­Ã¢â‚¬Â°ÃƒÂ¥Ã‚Â¾Ã¢â‚¬Â¦ÃƒÂ¤Ã‚Â½Ã‚Â ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¨Ã‚Â¦Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚Â"
+		text, keyboard = "å‘é€è¦åˆ é™¤çš„å…³é”®è¯ï¼Œå¤šä¸ªç”¨ | æˆ–æ¢è¡Œåˆ†éš”ã€‚\n\næ”¯æŒï¼š\nç²¾å‡†:å…³é”®è¯\næ¨¡ç³Š:å…³é”®è¯\næˆ–ç›´æŽ¥å‘å…³é”®è¯æ–‡æœ¬ï¼ˆä¼šåˆ é™¤åŒåçš„ç²¾å‡†/æ¨¡ç³Šè§„åˆ™ï¼‰ã€‚", s.keywordsKeyboard()
+		alert = "ç­‰å¾…ä½ å‘é€è¦åˆ é™¤çš„å…³é”®è¯"
 	case callbackDMPool:
 		text, keyboard = s.dmPoolText(), s.dmPoolKeyboard()
 	case callbackDMConnect:
 		s.setPending(callback.From.ID, pendingLoginDM)
 		text, keyboard = s.dmConnectPrompt(), s.dmPoolKeyboard()
-		alert = "ÃƒÂ¦Ã…Â Ã…Â ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¦Ã¢â‚¬Â°Ã¢â‚¬Â¹ÃƒÂ¦Ã…â€œÃ‚ÂºÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ§Ã¢â‚¬ÂºÃ‚Â´ÃƒÂ¦Ã…Â½Ã‚Â¥ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ§Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¦Ã‹â€ Ã¢â‚¬Ëœ"
+		alert = "æŠŠç§ä¿¡å·æ‰‹æœºå·ç›´æŽ¥å‘ç»™æˆ‘"
 	case callbackDMUpload:
 		s.setPending(callback.From.ID, pendingUploadDMSess)
 		text, keyboard = s.dmUploadPrompt(), s.dmPoolKeyboard()
-		alert = "ÃƒÂ¦Ã…Â Ã…Â  session ÃƒÂ¦Ã¢â‚¬â€œÃ¢â‚¬Â¡ÃƒÂ¤Ã‚Â»Ã‚Â¶ÃƒÂ§Ã¢â‚¬ÂºÃ‚Â´ÃƒÂ¦Ã…Â½Ã‚Â¥ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ§Ã‚Â»Ã¢â€žÂ¢ÃƒÂ¦Ã‹â€ Ã¢â‚¬Ëœ"
+		alert = "æŠŠ session æ–‡ä»¶ç›´æŽ¥å‘ç»™æˆ‘"
 	case callbackDMList:
 		text, keyboard = s.dmAccountsText(), s.dmAccountsKeyboard()
 	case callbackDMCheckAll:
@@ -356,37 +356,37 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 		text, keyboard = s.dmTemplatesText(), s.dmTemplatesKeyboard()
 	case callbackDMTemplateAdd:
 		s.setPending(callback.From.ID, pendingNone)
-		text, keyboard = "Ã©â‚¬â€°Ã¦â€¹Â©Ã¨Â¦ÂÃ¦Â·Â»Ã¥Å Â Ã§Å¡â€žÃ¨Â¯ÂÃ¦Å“Â¯Ã¥Ââ€˜Ã©â‚¬ÂÃ¦Â¨Â¡Ã¥Â¼ÂÃ£â‚¬â€š", s.dmTemplateModeKeyboard()
-		alert = "Ã¨Â¯Â·Ã©â‚¬â€°Ã¦â€¹Â©Ã¨Â¯ÂÃ¦Å“Â¯Ã¥Ââ€˜Ã©â‚¬ÂÃ¦Â¨Â¡Ã¥Â¼Â"
+		text, keyboard = "选择要添加的话术发送模式。", s.dmTemplateModeKeyboard()
+		alert = "请选择话术发送模式"
 	case callbackDMTemplateAddText:
 		s.setPending(callback.From.ID, pendingAddDMText)
 		text, keyboard = s.dmTemplateTextPrompt(), s.dmTemplateModeKeyboard()
-		alert = "Ã¥Ââ€˜Ã©â‚¬ÂÃ¦â€“â€¡Ã¦Å“Â¬Ã¨Â¯ÂÃ¦Å“Â¯Ã¥â€ â€¦Ã¥Â®Â¹"
+		alert = "发送文本话术内容"
 	case callbackDMTemplateAddPost:
 		s.setPending(callback.From.ID, pendingAddDMPostBot)
 		text, keyboard = s.dmTemplatePostBotPrompt(), s.dmTemplateModeKeyboard()
-		alert = "Ã¥Ââ€˜Ã©â‚¬Â PostBot Ã¤Â»Â£Ã§Â Â"
+		alert = "发送 PostBot 代码"
 	case callbackDMTemplateAddFwd:
 		s.setPending(callback.From.ID, pendingAddDMForward)
 		text, keyboard = s.dmTemplateForwardPrompt(false), s.dmTemplateModeKeyboard()
-		alert = "Ã¥Ââ€˜Ã©â‚¬ÂÃ©Â¢â€˜Ã©Ââ€œÃ¨Â´Â´Ã¦â€“â€¡Ã©â€œÂ¾Ã¦Å½Â¥"
+		alert = "发送频道贴文链接"
 	case callbackDMTemplateAddHide:
 		s.setPending(callback.From.ID, pendingAddDMHidden)
 		text, keyboard = s.dmTemplateForwardPrompt(true), s.dmTemplateModeKeyboard()
-		alert = "Ã¥Ââ€˜Ã©â‚¬ÂÃ©Å¡ÂÃ¨â€”ÂÃ¦ÂÂ¥Ã¦ÂºÂÃ¨Â½Â¬Ã¥Ââ€˜Ã©â€œÂ¾Ã¦Å½Â¥"
+		alert = "发送隐藏来源转发链接"
 	case callbackDMTemplateAddQuick:
 		s.setPending(callback.From.ID, pendingAddDMQuickReply)
 		text, keyboard = s.dmTemplateQuickReplyPrompt(), s.dmTemplateModeKeyboard()
-		alert = "Ã¥Ââ€˜Ã©â‚¬ÂÃ¥Â¿Â«Ã¦ÂÂ·Ã¥â€ºÅ¾Ã¥Â¤Â ID"
+		alert = "发送快捷回复 ID"
 	case callbackDMTemplateRemove:
 		s.setPending(callback.From.ID, pendingRemoveDMTpl)
-		text, keyboard = "Ã¥Ââ€˜Ã©â‚¬ÂÃ¨Â¦ÂÃ¥Ë†Â Ã©â„¢Â¤Ã§Å¡â€žÃ¨Â¯ÂÃ¦Å“Â¯Ã§Â¼â€“Ã¥ÂÂ·Ã¦Ë†â€“Ã¥â€ â€¦Ã¥Â®Â¹Ã¯Â¼Å’Ã¦â€Â¯Ã¦Å’ÂÃ¤Â¸â‚¬Ã¦Â¬Â¡Ã¥Ë†Â Ã©â„¢Â¤Ã¥Â¤Å¡Ã¦ÂÂ¡Ã¯Â¼Å’Ã¤Â½Â¿Ã§â€Â¨ |Ã£â‚¬ÂÃ¦ÂÂ¢Ã¨Â¡Å’Ã¦Ë†â€“Ã©â‚¬â€”Ã¥ÂÂ·Ã¥Ë†â€ Ã©Å¡â€Ã£â‚¬â€š", s.dmTemplatesKeyboard()
-		alert = "Ã§Â­â€°Ã¥Â¾â€¦Ã¤Â½Â Ã¥Ââ€˜Ã©â‚¬ÂÃ¨Â¦ÂÃ¥Ë†Â Ã©â„¢Â¤Ã§Å¡â€žÃ¨Â¯ÂÃ¦Å“Â¯"
+		text, keyboard = "发送要删除的话术编号或内容，支持一次删除多条，使用 |、换行或逗号分隔。", s.dmTemplatesKeyboard()
+		alert = "等待你发送要删除的话术"
 	case callbackDMRecords:
 		text, keyboard = s.dmRecordsText(), s.dmRecordsKeyboard()
 	case callbackDMExportFailed:
 		err = s.sendFailedDMExport(ctx, callback.Message.Chat.ID)
-		alert = "ÃƒÂ¥Ã‚Â¼Ã¢â‚¬Å¡ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¨Ã‚Â®Ã‚Â°ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚Âº"
+		alert = "å¼‚å¸¸ç§ä¿¡è®°å½•å·²å¯¼å‡º"
 		if err == nil {
 			text, keyboard = s.dmRecordsText(), s.dmRecordsKeyboard()
 		}
@@ -402,10 +402,10 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 		text, keyboard = s.exportKeywordPrompt(), s.cancelExportKeyboard()
 	case callbackExportAll:
 		s.setExportContext(callback.From.ID, exportContext{filterType: exportAll})
-		text, keyboard = "ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ©Ã¢â€šÂ¬Ã¢â‚¬Â°ÃƒÂ¦Ã¢â‚¬Â¹Ã‚Â©ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â¨ÃƒÂ©Ã†â€™Ã‚Â¨ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ¦Ã‚ÂÃ‚Â®ÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¨Ã‚Â¯Ã‚Â·ÃƒÂ©Ã¢â€šÂ¬Ã¢â‚¬Â°ÃƒÂ¦Ã¢â‚¬Â¹Ã‚Â©ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¦Ã‚Â Ã‚Â¼ÃƒÂ¥Ã‚Â¼Ã‚ÂÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.exportFormatKeyboard()
+		text, keyboard = "å·²é€‰æ‹©å¯¼å‡ºå…¨éƒ¨æ•°æ®ï¼Œè¯·é€‰æ‹©å¯¼å‡ºæ ¼å¼ã€‚", s.exportFormatKeyboard()
 	case callbackExportFormatUsers, callbackExportFormatIDs, callbackExportFormatCSV:
 		err = s.sendExportFile(ctx, callback.Message.Chat.ID, callback.From.ID, callback.Data)
-		alert = "ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¦Ã¢â‚¬â€œÃ¢â‚¬Â¡ÃƒÂ¤Ã‚Â»Ã‚Â¶ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚Â"
+		alert = "å¯¼å‡ºæ–‡ä»¶å·²å‘é€"
 		if err == nil {
 			text, keyboard = s.exportText(), s.exportKeyboard()
 		}
@@ -417,9 +417,9 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 		text, keyboard = s.rulesText(), s.rulesKeyboard()
 		if err == nil {
 			if enabled {
-				alert = "ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¦Ã…Â½Ã‚Â§ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã‚Â¼Ã¢â€šÂ¬ÃƒÂ¥Ã‚ÂÃ‚Â¯"
+				alert = "ç›‘æŽ§å·²å¼€å¯"
 			} else {
-				alert = "ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¦Ã…Â½Ã‚Â§ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬â€Ã‚Â­"
+				alert = "ç›‘æŽ§å·²å…³é—­"
 			}
 		}
 	case callbackToggleDryRun:
@@ -428,48 +428,48 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 		text, keyboard = s.rulesText(), s.rulesKeyboard()
 		if err == nil {
 			if enabled {
-				alert = "ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â¡ÃƒÂ¥Ã‹â€ Ã‚Â° dry-run"
+				alert = "å·²åˆ‡åˆ° dry-run"
 			} else {
-				alert = "ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â¡ÃƒÂ¥Ã‹â€ Ã‚Â°ÃƒÂ§Ã…â€œÃ…Â¸ÃƒÂ¥Ã‚Â®Ã…Â¾ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚Â"
+				alert = "å·²åˆ‡åˆ°çœŸå®žå‘é€"
 			}
 		}
 	case callbackSetCooldown:
 		s.setPending(callback.From.ID, pendingSetCooldown)
-		text, keyboard = "ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¦Ã¢â‚¬â€œÃ‚Â°ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¥Ã‚Â¤Ã‚ÂÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã¢â‚¬â„¢Ã…Â¸ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¦Ã‚Â¯Ã¢â‚¬ÂÃƒÂ¥Ã‚Â¦Ã¢â‚¬Å¡ 1440ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.rulesKeyboard()
-		alert = "ÃƒÂ§Ã‚Â­Ã¢â‚¬Â°ÃƒÂ¥Ã‚Â¾Ã¢â‚¬Â¦ÃƒÂ¤Ã‚Â½Ã‚Â ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã¢â‚¬â„¢Ã…Â¸ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°"
+		text, keyboard = "å‘é€æ–°çš„åŒç”¨æˆ·é‡å¤ç§ä¿¡å†·å´åˆ†é’Ÿæ•°ï¼Œæ¯”å¦‚ 1440ã€‚", s.rulesKeyboard()
+		alert = "ç­‰å¾…ä½ å‘é€å†·å´åˆ†é’Ÿæ•°"
 	case callbackSetChatCooldown:
 		s.setPending(callback.From.ID, pendingSetChatCooldown)
-		text, keyboard = "ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ§Ã‚Â¾Ã‚Â¤ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¥Ã‚Â¤Ã‚ÂÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã¢â‚¬â„¢Ã…Â¸ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã‚Â¡Ã‚Â« 0 ÃƒÂ¨Ã‚Â¡Ã‚Â¨ÃƒÂ§Ã‚Â¤Ã‚ÂºÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬â€Ã‚Â­ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.rulesKeyboard()
-		alert = "ÃƒÂ§Ã‚Â­Ã¢â‚¬Â°ÃƒÂ¥Ã‚Â¾Ã¢â‚¬Â¦ÃƒÂ¤Ã‚Â½Ã‚Â ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ§Ã‚Â¾Ã‚Â¤ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã¢â‚¬â„¢Ã…Â¸ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°"
+		text, keyboard = "å‘é€åŒç¾¤é‡å¤ç§ä¿¡å†·å´åˆ†é’Ÿæ•°ï¼Œå¡« 0 è¡¨ç¤ºå…³é—­ã€‚", s.rulesKeyboard()
+		alert = "ç­‰å¾…ä½ å‘é€åŒç¾¤å†·å´åˆ†é’Ÿæ•°"
 	case callbackSetTextCooldown:
 		s.setPending(callback.From.ID, pendingSetTextCooldown)
-		text, keyboard = "ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ¥Ã¢â‚¬Â Ã¢â‚¬Â¦ÃƒÂ¥Ã‚Â®Ã‚Â¹ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¥Ã‚Â¤Ã‚ÂÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã¢â‚¬â„¢Ã…Â¸ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã‚Â¡Ã‚Â« 0 ÃƒÂ¨Ã‚Â¡Ã‚Â¨ÃƒÂ§Ã‚Â¤Ã‚ÂºÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬â€Ã‚Â­ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.rulesKeyboard()
-		alert = "ÃƒÂ§Ã‚Â­Ã¢â‚¬Â°ÃƒÂ¥Ã‚Â¾Ã¢â‚¬Â¦ÃƒÂ¤Ã‚Â½Ã‚Â ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ¥Ã¢â‚¬Â Ã¢â‚¬Â¦ÃƒÂ¥Ã‚Â®Ã‚Â¹ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã¢â‚¬â„¢Ã…Â¸ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°"
+		text, keyboard = "å‘é€åŒå†…å®¹é‡å¤ç§ä¿¡å†·å´åˆ†é’Ÿæ•°ï¼Œå¡« 0 è¡¨ç¤ºå…³é—­ã€‚", s.rulesKeyboard()
+		alert = "ç­‰å¾…ä½ å‘é€åŒå†…å®¹å†·å´åˆ†é’Ÿæ•°"
 	case callbackSetTemplate:
 		s.setPending(callback.From.ID, pendingSetTemplate)
-		text, keyboard = "ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¦Ã¢â‚¬â€œÃ‚Â°ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ¦Ã‚ÂÃ‚Â¿ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡ÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¥Ã‚ÂÃ‹Å“ÃƒÂ©Ã¢â‚¬Â¡Ã‚Â: {username} {chat_title} {keywords} {message}", s.rulesKeyboard()
-		alert = "ÃƒÂ§Ã‚Â­Ã¢â‚¬Â°ÃƒÂ¥Ã‚Â¾Ã¢â‚¬Â¦ÃƒÂ¤Ã‚Â½Ã‚Â ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ¦Ã‚ÂÃ‚Â¿"
+		text, keyboard = "å‘é€æ–°çš„ç§ä¿¡æ¨¡æ¿ã€‚å¯ç”¨å˜é‡: {username} {chat_title} {keywords} {message}", s.rulesKeyboard()
+		alert = "ç­‰å¾…ä½ å‘é€ç§ä¿¡æ¨¡æ¿"
 	case callbackSetMinLength:
 		s.setPending(callback.From.ID, pendingSetMinLength)
-		text, keyboard = "ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã¢â‚¬Â¢Ã‚Â¿ÃƒÂ¥Ã‚ÂºÃ‚Â¦ÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã‚Â¡Ã‚Â« 0 ÃƒÂ¨Ã‚Â¡Ã‚Â¨ÃƒÂ§Ã‚Â¤Ã‚ÂºÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.rulesKeyboard()
-		alert = "ÃƒÂ§Ã‚Â­Ã¢â‚¬Â°ÃƒÂ¥Ã‚Â¾Ã¢â‚¬Â¦ÃƒÂ¤Ã‚Â½Ã‚Â ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã¢â‚¬Â¢Ã‚Â¿ÃƒÂ¥Ã‚ÂºÃ‚Â¦"
+		text, keyboard = "å‘é€æœ€å°æ¶ˆæ¯é•¿åº¦ï¼Œå¡« 0 è¡¨ç¤ºä¸é™åˆ¶ã€‚", s.rulesKeyboard()
+		alert = "ç­‰å¾…ä½ å‘é€æœ€å°æ¶ˆæ¯é•¿åº¦"
 	case callbackSetMaxLength:
 		s.setPending(callback.From.ID, pendingSetMaxLength)
-		text, keyboard = "ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â¤Ã‚Â§ÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã¢â‚¬Â¢Ã‚Â¿ÃƒÂ¥Ã‚ÂºÃ‚Â¦ÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã‚Â¡Ã‚Â« 0 ÃƒÂ¨Ã‚Â¡Ã‚Â¨ÃƒÂ§Ã‚Â¤Ã‚ÂºÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.rulesKeyboard()
-		alert = "ÃƒÂ§Ã‚Â­Ã¢â‚¬Â°ÃƒÂ¥Ã‚Â¾Ã¢â‚¬Â¦ÃƒÂ¤Ã‚Â½Ã‚Â ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â¤Ã‚Â§ÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã¢â‚¬Â¢Ã‚Â¿ÃƒÂ¥Ã‚ÂºÃ‚Â¦"
+		text, keyboard = "å‘é€æœ€å¤§æ¶ˆæ¯é•¿åº¦ï¼Œå¡« 0 è¡¨ç¤ºä¸é™åˆ¶ã€‚", s.rulesKeyboard()
+		alert = "ç­‰å¾…ä½ å‘é€æœ€å¤§æ¶ˆæ¯é•¿åº¦"
 	case callbackSetMinAge:
 		s.setPending(callback.From.ID, pendingSetMinAge)
-		text, keyboard = "ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‚Â¹Ã‚Â´ÃƒÂ©Ã‚Â¾Ã¢â‚¬Å¾ÃƒÂ¥Ã‚Â¤Ã‚Â©ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã‚Â¡Ã‚Â« 0 ÃƒÂ¨Ã‚Â¡Ã‚Â¨ÃƒÂ§Ã‚Â¤Ã‚ÂºÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.rulesKeyboard()
-		alert = "ÃƒÂ§Ã‚Â­Ã¢â‚¬Â°ÃƒÂ¥Ã‚Â¾Ã¢â‚¬Â¦ÃƒÂ¤Ã‚Â½Ã‚Â ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‚Â¹Ã‚Â´ÃƒÂ©Ã‚Â¾Ã¢â‚¬Å¾"
+		text, keyboard = "å‘é€æœ€å°è´¦å·å¹´é¾„å¤©æ•°ï¼Œå¡« 0 è¡¨ç¤ºä¸é™åˆ¶ã€‚", s.rulesKeyboard()
+		alert = "ç­‰å¾…ä½ å‘é€è´¦å·å¹´é¾„"
 	case callbackToggleNoName:
 		var enabled bool
 		enabled, err = s.settings.ToggleFilterNoUsername()
 		text, keyboard = s.rulesText(), s.rulesKeyboard()
 		if err == nil {
 			if enabled {
-				alert = "ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã‚Â¼Ã¢â€šÂ¬ÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤"
+				alert = "å·²å¼€å¯æ— ç”¨æˆ·åè¿‡æ»¤"
 			} else {
-				alert = "ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬â€Ã‚Â­ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤"
+				alert = "å·²å…³é—­æ— ç”¨æˆ·åè¿‡æ»¤"
 			}
 		}
 	case callbackToggleNoPhoto:
@@ -478,37 +478,37 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 		text, keyboard = s.rulesText(), s.rulesKeyboard()
 		if err == nil {
 			if enabled {
-				alert = "ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã‚Â¼Ã¢â€šÂ¬ÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ¥Ã‚Â¤Ã‚Â´ÃƒÂ¥Ã†â€™Ã‚ÂÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤"
+				alert = "å·²å¼€å¯æ— å¤´åƒè¿‡æ»¤"
 			} else {
-				alert = "ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬â€Ã‚Â­ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ¥Ã‚Â¤Ã‚Â´ÃƒÂ¥Ã†â€™Ã‚ÂÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤"
+				alert = "å·²å…³é—­æ— å¤´åƒè¿‡æ»¤"
 			}
 		}
 	case callbackChats:
 		text, keyboard = s.chatsText(), s.chatsKeyboard()
 	case callbackAddChat:
 		s.setPending(callback.From.ID, pendingAddChatIDs)
-		text, keyboard = "ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¨Ã‚Â¦Ã‚ÂÃƒÂ¦Ã‚Â·Ã‚Â»ÃƒÂ¥Ã…Â Ã‚Â ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚Â¬ÃƒÂ§Ã‚Â¾Ã‚Â¤ IDÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã‚Â¤Ã…Â¡ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ | ÃƒÂ¦Ã‹â€ Ã¢â‚¬â€œÃƒÂ¦Ã‚ÂÃ‚Â¢ÃƒÂ¨Ã‚Â¡Ã…â€™ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã…Â¡Ã¢â‚¬ÂÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.chatsKeyboard()
-		alert = "ÃƒÂ§Ã‚Â­Ã¢â‚¬Â°ÃƒÂ¥Ã‚Â¾Ã¢â‚¬Â¦ÃƒÂ¤Ã‚Â½Ã‚Â ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ§Ã‚Â¾Ã‚Â¤ ID"
+		text, keyboard = "å‘é€è¦æ·»åŠ çš„ç›‘å¬ç¾¤ IDï¼Œå¤šä¸ªç”¨ | æˆ–æ¢è¡Œåˆ†éš”ã€‚", s.chatsKeyboard()
+		alert = "ç­‰å¾…ä½ å‘é€ç¾¤ ID"
 	case callbackRemoveChat:
 		s.setPending(callback.From.ID, pendingRemoveChatIDs)
-		text, keyboard = "ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¨Ã‚Â¦Ã‚ÂÃƒÂ§Ã‚Â§Ã‚Â»ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚Â¬ÃƒÂ§Ã‚Â¾Ã‚Â¤ IDÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã‚Â¤Ã…Â¡ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ | ÃƒÂ¦Ã‹â€ Ã¢â‚¬â€œÃƒÂ¦Ã‚ÂÃ‚Â¢ÃƒÂ¨Ã‚Â¡Ã…â€™ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã…Â¡Ã¢â‚¬ÂÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.chatsKeyboard()
-		alert = "ÃƒÂ§Ã‚Â­Ã¢â‚¬Â°ÃƒÂ¥Ã‚Â¾Ã¢â‚¬Â¦ÃƒÂ¤Ã‚Â½Ã‚Â ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¨Ã‚Â¦Ã‚ÂÃƒÂ§Ã‚Â§Ã‚Â»ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ§Ã‚Â¾Ã‚Â¤ ID"
+		text, keyboard = "å‘é€è¦ç§»é™¤çš„ç›‘å¬ç¾¤ IDï¼Œå¤šä¸ªç”¨ | æˆ–æ¢è¡Œåˆ†éš”ã€‚", s.chatsKeyboard()
+		alert = "ç­‰å¾…ä½ å‘é€è¦ç§»é™¤çš„ç¾¤ ID"
 	case callbackSetAlertChat:
 		err = s.settings.SetAlertChatID(callback.Message.Chat.ID)
 		text, keyboard = s.rulesText(), s.rulesKeyboard()
 		if err == nil {
-			alert = "ÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ¨Ã‚ÂÃ…Â ÃƒÂ¥Ã‚Â¤Ã‚Â©ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¨Ã‚Â®Ã‚Â¾ÃƒÂ¤Ã‚Â¸Ã‚ÂºÃƒÂ©Ã¢â€šÂ¬Ã…Â¡ÃƒÂ§Ã…Â¸Ã‚Â¥ÃƒÂ§Ã‚Â¾Ã‚Â¤"
+			alert = "å½“å‰èŠå¤©å·²è®¾ä¸ºé€šçŸ¥ç¾¤"
 		}
 	case callbackBlacklist:
 		text, keyboard = s.blacklistText(), s.blacklistKeyboard()
 	case callbackUnblockUser:
 		s.setPending(callback.From.ID, pendingUnblockUsers)
-		text, keyboard = "ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¨Ã‚Â¦Ã‚ÂÃƒÂ§Ã‚Â§Ã‚Â»ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â· IDÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã‚Â¤Ã…Â¡ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ | ÃƒÂ¦Ã‹â€ Ã¢â‚¬â€œÃƒÂ¦Ã‚ÂÃ‚Â¢ÃƒÂ¨Ã‚Â¡Ã…â€™ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã…Â¡Ã¢â‚¬ÂÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.blacklistKeyboard()
-		alert = "ÃƒÂ§Ã‚Â­Ã¢â‚¬Â°ÃƒÂ¥Ã‚Â¾Ã¢â‚¬Â¦ÃƒÂ¤Ã‚Â½Ã‚Â ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â· ID"
+		text, keyboard = "å‘é€è¦ç§»å‡ºé»‘åå•çš„ç”¨æˆ· IDï¼Œå¤šä¸ªç”¨ | æˆ–æ¢è¡Œåˆ†éš”ã€‚", s.blacklistKeyboard()
+		alert = "ç­‰å¾…ä½ å‘é€ç”¨æˆ· ID"
 	case callbackUnblockChat:
 		s.setPending(callback.From.ID, pendingUnblockChats)
-		text, keyboard = "ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¨Ã‚Â¦Ã‚ÂÃƒÂ§Ã‚Â§Ã‚Â»ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ§Ã‚Â¾Ã‚Â¤ IDÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã‚Â¤Ã…Â¡ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ | ÃƒÂ¦Ã‹â€ Ã¢â‚¬â€œÃƒÂ¦Ã‚ÂÃ‚Â¢ÃƒÂ¨Ã‚Â¡Ã…â€™ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã…Â¡Ã¢â‚¬ÂÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.blacklistKeyboard()
-		alert = "ÃƒÂ§Ã‚Â­Ã¢â‚¬Â°ÃƒÂ¥Ã‚Â¾Ã¢â‚¬Â¦ÃƒÂ¤Ã‚Â½Ã‚Â ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ§Ã‚Â¾Ã‚Â¤ ID"
+		text, keyboard = "å‘é€è¦ç§»å‡ºé»‘åå•çš„ç¾¤ IDï¼Œå¤šä¸ªç”¨ | æˆ–æ¢è¡Œåˆ†éš”ã€‚", s.blacklistKeyboard()
+		alert = "ç­‰å¾…ä½ å‘é€ç¾¤ ID"
 	case callbackStatus:
 		text, keyboard = s.statusText(), s.statusKeyboard()
 	default:
@@ -520,14 +520,14 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 			phone := strings.TrimPrefix(callback.Data, callbackAccountRetryPrefix)
 			err = s.monitorManager.RestartMonitor(ctx, phone)
 			if err == nil {
-				alert = "ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¦Ã¢â‚¬â€œÃ‚Â°ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ¨Ã‚ÂµÃ‚Â·ÃƒÂ¨Ã‚Â¿Ã…Â¾ÃƒÂ¦Ã…Â½Ã‚Â¥"
+				alert = "å·²é‡æ–°å‘èµ·è¿žæŽ¥"
 				text, keyboard, _ = s.accountDetailText(phone)
 			}
 		case strings.HasPrefix(callback.Data, callbackAccountDeletePrefix):
 			phone := strings.TrimPrefix(callback.Data, callbackAccountDeletePrefix)
 			err = s.monitorManager.DeleteMonitor(ctx, phone)
 			if err == nil {
-				alert = "ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¦Ã…Â½Ã‚Â§ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã‹â€ Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤"
+				alert = "ç›‘æŽ§å·å·²åˆ é™¤"
 				text, keyboard = s.accountsListText(), s.accountsListKeyboard()
 			}
 		case strings.HasPrefix(callback.Data, callbackDMDetailPrefix):
@@ -545,14 +545,14 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 			phone := strings.TrimPrefix(callback.Data, callbackDMRetryPrefix)
 			err = s.dmManager.RestartDMAccount(ctx, phone)
 			if err == nil {
-				alert = "ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¦Ã¢â‚¬â€œÃ‚Â°ÃƒÂ¨Ã‚Â¿Ã…Â¾ÃƒÂ¦Ã…Â½Ã‚Â¥ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·"
+				alert = "å·²é‡æ–°è¿žæŽ¥ç§ä¿¡å·"
 				text, keyboard, _ = s.dmAccountDetailText(phone)
 			}
 		case strings.HasPrefix(callback.Data, callbackDMDeletePrefix):
 			phone := strings.TrimPrefix(callback.Data, callbackDMDeletePrefix)
 			err = s.dmManager.DeleteDMAccount(ctx, phone)
 			if err == nil {
-				alert = "ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã‹â€ Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤"
+				alert = "ç§ä¿¡å·å·²åˆ é™¤"
 				text, keyboard = s.dmAccountsText(), s.dmAccountsKeyboard()
 			}
 		case strings.HasPrefix(callback.Data, callbackBlockUser):
@@ -560,7 +560,7 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 		case strings.HasPrefix(callback.Data, callbackBlockChat):
 			alert, err = s.blockChatCallback(callback.Data)
 		default:
-			return true, s.client.AnswerCallbackQuery(ctx, callback.ID, "ÃƒÂ¦Ã…â€œÃ‚ÂªÃƒÂ§Ã…Â¸Ã‚Â¥ÃƒÂ¦Ã¢â‚¬Å“Ã‚ÂÃƒÂ¤Ã‚Â½Ã…â€œ")
+			return true, s.client.AnswerCallbackQuery(ctx, callback.ID, "æœªçŸ¥æ“ä½œ")
 		}
 	}
 
@@ -570,7 +570,7 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 
 	answerText := alert
 	if err != nil {
-		answerText = "ÃƒÂ¦Ã¢â‚¬Å“Ã‚ÂÃƒÂ¤Ã‚Â½Ã…â€œÃƒÂ¥Ã‚Â¤Ã‚Â±ÃƒÂ¨Ã‚Â´Ã‚Â¥: " + err.Error()
+		answerText = "æ“ä½œå¤±è´¥: " + err.Error()
 	}
 	if answerText == "" {
 		answerText = "ok"
@@ -587,33 +587,33 @@ func (s *AdminService) handlePendingInput(ctx context.Context, msg *model.Messag
 	case pendingLoginMonitor:
 		phones := splitInputParts(text)
 		if len(phones) == 0 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¦Ã¢â‚¬Â°Ã¢â‚¬Â¹ÃƒÂ¦Ã…â€œÃ‚ÂºÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ¨Ã†â€™Ã‚Â½ÃƒÂ¤Ã‚Â¸Ã‚ÂºÃƒÂ§Ã‚Â©Ã‚ÂºÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.backToAccountsKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "æ‰‹æœºå·ä¸èƒ½ä¸ºç©ºã€‚", s.backToAccountsKeyboard())
 		}
 		if len(phones) > 1 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¤Ã‚Â¸Ã¢â€šÂ¬ÃƒÂ¦Ã‚Â¬Ã‚Â¡ÃƒÂ¥Ã¢â‚¬Â¦Ã‹â€ ÃƒÂ§Ã¢â€žÂ¢Ã‚Â»ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢ÃƒÂ¤Ã‚Â¸Ã¢â€šÂ¬ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¦Ã…Â½Ã‚Â§ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡ÃƒÂ¥Ã‚Â¤Ã…Â¡ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¦Ã…Â½Ã‚Â§ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¨Ã‚Â¯Ã‚Â·ÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ¦Ã‚Â·Ã‚Â»ÃƒÂ¥Ã…Â Ã‚Â ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.backToAccountsKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "ä¸€æ¬¡å…ˆç™»å½•ä¸€ä¸ªç›‘æŽ§å·ã€‚å¤šä¸ªç›‘æŽ§å·è¯·é€ä¸ªæ·»åŠ ã€‚", s.backToAccountsKeyboard())
 		}
 		if s.monitorManager == nil {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ¦Ã‚Â²Ã‚Â¡ÃƒÂ¦Ã…â€œÃ¢â‚¬Â°ÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¦Ã…Â½Ã‚Â§ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ§Ã‚Â®Ã‚Â¡ÃƒÂ§Ã‚ÂÃ¢â‚¬Â ÃƒÂ¥Ã¢â€žÂ¢Ã‚Â¨ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.backToAccountsKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "å½“å‰æ²¡æœ‰å¯ç”¨çš„ç›‘æŽ§è´¦å·ç®¡ç†å™¨ã€‚", s.backToAccountsKeyboard())
 		}
 		result, err := s.monitorManager.StartMonitorLogin(ctx, phones[0])
 		if err != nil {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ¥Ã…Â Ã‚Â¨ÃƒÂ§Ã¢â€žÂ¢Ã‚Â»ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢ÃƒÂ¥Ã‚Â¤Ã‚Â±ÃƒÂ¨Ã‚Â´Ã‚Â¥: "+err.Error(), s.backToAccountsKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "å¯åŠ¨ç™»å½•å¤±è´¥: "+err.Error(), s.backToAccountsKeyboard())
 		}
 		return s.client.SendMessage(ctx, msg.Chat.ID, result+"\n\n"+s.accountsOverviewText(), s.accountsMenuKeyboard())
 	case pendingLoginDM:
 		phones := splitInputParts(text)
 		if len(phones) == 0 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¦Ã¢â‚¬Â°Ã¢â‚¬Â¹ÃƒÂ¦Ã…â€œÃ‚ÂºÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ¨Ã†â€™Ã‚Â½ÃƒÂ¤Ã‚Â¸Ã‚ÂºÃƒÂ§Ã‚Â©Ã‚ÂºÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.dmPoolKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "æ‰‹æœºå·ä¸èƒ½ä¸ºç©ºã€‚", s.dmPoolKeyboard())
 		}
 		if len(phones) > 1 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¤Ã‚Â¸Ã¢â€šÂ¬ÃƒÂ¦Ã‚Â¬Ã‚Â¡ÃƒÂ¥Ã¢â‚¬Â¦Ã‹â€ ÃƒÂ§Ã¢â€žÂ¢Ã‚Â»ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢ÃƒÂ¤Ã‚Â¸Ã¢â€šÂ¬ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡ÃƒÂ¥Ã‚Â¤Ã…Â¡ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¨Ã‚Â¯Ã‚Â·ÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ¦Ã‚Â·Ã‚Â»ÃƒÂ¥Ã…Â Ã‚Â ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.dmPoolKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "ä¸€æ¬¡å…ˆç™»å½•ä¸€ä¸ªç§ä¿¡å·ã€‚å¤šä¸ªç§ä¿¡å·è¯·é€ä¸ªæ·»åŠ ã€‚", s.dmPoolKeyboard())
 		}
 		if s.dmManager == nil {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ¦Ã‚Â²Ã‚Â¡ÃƒÂ¦Ã…â€œÃ¢â‚¬Â°ÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ§Ã‚Â®Ã‚Â¡ÃƒÂ§Ã‚ÂÃ¢â‚¬Â ÃƒÂ¥Ã¢â€žÂ¢Ã‚Â¨ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.dmPoolKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "å½“å‰æ²¡æœ‰å¯ç”¨çš„ç§ä¿¡å·ç®¡ç†å™¨ã€‚", s.dmPoolKeyboard())
 		}
 		result, err := s.dmManager.StartDMLogin(ctx, phones[0])
 		if err != nil {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ¥Ã…Â Ã‚Â¨ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ§Ã¢â€žÂ¢Ã‚Â»ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢ÃƒÂ¥Ã‚Â¤Ã‚Â±ÃƒÂ¨Ã‚Â´Ã‚Â¥: "+err.Error(), s.dmPoolKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "å¯åŠ¨ç§ä¿¡å·ç™»å½•å¤±è´¥: "+err.Error(), s.dmPoolKeyboard())
 		}
 		return s.client.SendMessage(ctx, msg.Chat.ID, result+"\n\n"+s.dmPoolText(), s.dmPoolKeyboard())
 	case pendingAddKeywordsExact:
@@ -621,61 +621,61 @@ func (s *AdminService) handlePendingInput(ctx context.Context, msg *model.Messag
 		if err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã‚Â·Ã‚Â»ÃƒÂ¥Ã…Â Ã‚Â  %d ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ§Ã‚Â²Ã‚Â¾ÃƒÂ¥Ã¢â‚¬Â¡Ã¢â‚¬Â ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\n%s", added, s.keywordsText()), s.keywordsKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("å·²æ·»åŠ  %d ä¸ªç²¾å‡†å…³é”®è¯ã€‚\n\n%s", added, s.keywordsText()), s.keywordsKeyboard())
 	case pendingAddKeywordsFuzzy, pendingAddKeywords:
 		added, err := s.keywordStore.AddWithMode("fuzzy", splitInputParts(text))
 		if err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã‚Â·Ã‚Â»ÃƒÂ¥Ã…Â Ã‚Â  %d ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ§Ã‚Â³Ã…Â ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\n%s", added, s.keywordsText()), s.keywordsKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("å·²æ·»åŠ  %d ä¸ªæ¨¡ç³Šå…³é”®è¯ã€‚\n\n%s", added, s.keywordsText()), s.keywordsKeyboard())
 	case pendingRemoveKeyword:
 		removed, err := s.keywordStore.Remove(splitInputParts(text))
 		if err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã‹â€ Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤ %d ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\n%s", removed, s.keywordsText()), s.keywordsKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("å·²åˆ é™¤ %d ä¸ªå…³é”®è¯ã€‚\n\n%s", removed, s.keywordsText()), s.keywordsKeyboard())
 	case pendingSetCooldown:
 		minutes, err := parseNonNegativeInt(text)
 		if err != nil || minutes <= 0 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¥Ã‚Â¤Ã‚ÂÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´ÃƒÂ¥Ã‚Â¿Ã¢â‚¬Â¦ÃƒÂ©Ã‚Â¡Ã‚Â»ÃƒÂ¦Ã‹Å“Ã‚Â¯ÃƒÂ¦Ã‚Â­Ã‚Â£ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â´ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.rulesKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "åŒç”¨æˆ·é‡å¤ç§ä¿¡å†·å´å¿…é¡»æ˜¯æ­£æ•´æ•°ã€‚", s.rulesKeyboard())
 		}
 		if err := s.settings.SetCooldownMinutes(minutes); err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¥Ã‚Â¤Ã‚ÂÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã¢â‚¬ÂºÃ‚Â´ÃƒÂ¦Ã¢â‚¬â€œÃ‚Â°ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\n"+s.rulesText(), s.rulesKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, "åŒç”¨æˆ·é‡å¤ç§ä¿¡å†·å´å·²æ›´æ–°ã€‚\n\n"+s.rulesText(), s.rulesKeyboard())
 	case pendingSetChatCooldown:
 		minutes, err := parseNonNegativeInt(text)
 		if err != nil || minutes < 0 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ§Ã‚Â¾Ã‚Â¤ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¥Ã‚Â¤Ã‚ÂÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´ÃƒÂ¥Ã‚Â¿Ã¢â‚¬Â¦ÃƒÂ©Ã‚Â¡Ã‚Â»ÃƒÂ¦Ã‹Å“Ã‚Â¯ÃƒÂ©Ã‚ÂÃ…Â¾ÃƒÂ¨Ã‚Â´Ã…Â¸ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â´ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.rulesKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "åŒç¾¤é‡å¤ç§ä¿¡å†·å´å¿…é¡»æ˜¯éžè´Ÿæ•´æ•°ã€‚", s.rulesKeyboard())
 		}
 		if err := s.settings.SetChatCooldownMinutes(minutes); err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ§Ã‚Â¾Ã‚Â¤ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¥Ã‚Â¤Ã‚ÂÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã¢â‚¬ÂºÃ‚Â´ÃƒÂ¦Ã¢â‚¬â€œÃ‚Â°ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\n"+s.rulesText(), s.rulesKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, "åŒç¾¤é‡å¤ç§ä¿¡å†·å´å·²æ›´æ–°ã€‚\n\n"+s.rulesText(), s.rulesKeyboard())
 	case pendingSetTextCooldown:
 		minutes, err := parseNonNegativeInt(text)
 		if err != nil || minutes < 0 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ¥Ã¢â‚¬Â Ã¢â‚¬Â¦ÃƒÂ¥Ã‚Â®Ã‚Â¹ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¥Ã‚Â¤Ã‚ÂÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´ÃƒÂ¥Ã‚Â¿Ã¢â‚¬Â¦ÃƒÂ©Ã‚Â¡Ã‚Â»ÃƒÂ¦Ã‹Å“Ã‚Â¯ÃƒÂ©Ã‚ÂÃ…Â¾ÃƒÂ¨Ã‚Â´Ã…Â¸ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â´ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.rulesKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "åŒå†…å®¹é‡å¤ç§ä¿¡å†·å´å¿…é¡»æ˜¯éžè´Ÿæ•´æ•°ã€‚", s.rulesKeyboard())
 		}
 		if err := s.settings.SetTextCooldownMinutes(minutes); err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ¥Ã¢â‚¬Â Ã¢â‚¬Â¦ÃƒÂ¥Ã‚Â®Ã‚Â¹ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¥Ã‚Â¤Ã‚ÂÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã¢â‚¬ÂºÃ‚Â´ÃƒÂ¦Ã¢â‚¬â€œÃ‚Â°ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\n"+s.rulesText(), s.rulesKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, "åŒå†…å®¹é‡å¤ç§ä¿¡å†·å´å·²æ›´æ–°ã€‚\n\n"+s.rulesText(), s.rulesKeyboard())
 	case pendingSetTemplate:
 		if strings.TrimSpace(text) == "" {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ¦Ã‚ÂÃ‚Â¿ÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ¨Ã†â€™Ã‚Â½ÃƒÂ¤Ã‚Â¸Ã‚ÂºÃƒÂ§Ã‚Â©Ã‚ÂºÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.rulesKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "æ¨¡æ¿ä¸èƒ½ä¸ºç©ºã€‚", s.rulesKeyboard())
 		}
 		if err := s.settings.SetDMTemplate(text); err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ¦Ã‚ÂÃ‚Â¿ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã¢â‚¬ÂºÃ‚Â´ÃƒÂ¦Ã¢â‚¬â€œÃ‚Â°ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\n"+s.rulesText(), s.rulesKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, "ç§ä¿¡æ¨¡æ¿å·²æ›´æ–°ã€‚\n\n"+s.rulesText(), s.rulesKeyboard())
 	case pendingAddDMTemplate:
 		templates, parseErr := parseDMTemplateInputs(text)
 		if parseErr != nil {
 			return s.client.SendMessage(ctx, msg.Chat.ID, parseErr.Error()+"\n\n"+s.dmTemplateAddPrompt(), s.dmTemplatesKeyboard())
 		}
 		if len(templates) == 0 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "Ã¦Â¨Â¡Ã¦ÂÂ¿Ã¤Â¸ÂÃ¨Æ’Â½Ã¤Â¸ÂºÃ§Â©ÂºÃ£â‚¬â€š", s.dmTemplatesKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "模板不能为空。", s.dmTemplatesKeyboard())
 		}
 		added, err := s.settings.AddDMTemplates(templates)
 		if err != nil {
@@ -684,86 +684,86 @@ func (s *AdminService) handlePendingInput(ctx context.Context, msg *model.Messag
 		if added > 0 {
 			_ = s.settings.SetDMTemplate(templates[0])
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("Ã¥Â·Â²Ã¦Â·Â»Ã¥Å Â  %d Ã¦ÂÂ¡Ã¨Â¯ÂÃ¦Å“Â¯Ã£â‚¬â€š\n\n%s", added, s.dmTemplatesText()), s.dmTemplatesKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("已添加 %d 条话术。\n\n%s", added, s.dmTemplatesText()), s.dmTemplatesKeyboard())
 	case pendingAddDMText:
-		return s.handleAddSingleDMTemplate(ctx, msg.Chat.ID, model.EncodeTextDMTemplate(text), "Ã¦â€“â€¡Ã¦Å“Â¬Ã§â€ºÂ´Ã¥Ââ€˜")
+		return s.handleAddSingleDMTemplate(ctx, msg.Chat.ID, model.EncodeTextDMTemplate(text), "文本直发")
 	case pendingAddDMPostBot:
-		return s.handleAddSingleDMTemplate(ctx, msg.Chat.ID, model.EncodePostBotDMTemplate(text), "Ã¥â€ â€¦Ã¨Ââ€Bot @PostBot")
+		return s.handleAddSingleDMTemplate(ctx, msg.Chat.ID, model.EncodePostBotDMTemplate(text), "内联Bot @PostBot")
 	case pendingAddDMForward:
-		return s.handleAddSingleDMTemplate(ctx, msg.Chat.ID, model.EncodeForwardDMTemplate(text), "Ã©Â¢â€˜Ã©Ââ€œÃ¨Â´Â´Ã¦â€“â€¡Ã¨Â½Â¬Ã¥Ââ€˜")
+		return s.handleAddSingleDMTemplate(ctx, msg.Chat.ID, model.EncodeForwardDMTemplate(text), "频道贴文转发")
 	case pendingAddDMHidden:
-		return s.handleAddSingleDMTemplate(ctx, msg.Chat.ID, model.EncodeHiddenForwardDMTemplate(text), "Ã©Å¡ÂÃ¨â€”ÂÃ¨Â½Â¬Ã¥Ââ€˜Ã¦ÂÂ¥Ã¦ÂºÂ")
+		return s.handleAddSingleDMTemplate(ctx, msg.Chat.ID, model.EncodeHiddenForwardDMTemplate(text), "隐藏转发来源")
 	case pendingAddDMQuickReply:
 		shortcutID, err := parseNonNegativeInt(text)
 		if err != nil || shortcutID <= 0 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "Ã¤Â¼ÂÃ¤Â¸Å¡Ã¥Â¿Â«Ã¦ÂÂ·Ã¥â€ºÅ¾Ã¥Â¤Â ID Ã¥Â¿â€¦Ã©Â¡Â»Ã¦ËœÂ¯Ã¥Â¤Â§Ã¤ÂºÅ½ 0 Ã§Å¡â€žÃ¦â€¢Â°Ã¥Â­â€”Ã£â‚¬â€š", s.dmTemplateModeKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "企业快捷回复 ID 必须是大于 0 的数字。", s.dmTemplateModeKeyboard())
 		}
-		return s.handleAddSingleDMTemplate(ctx, msg.Chat.ID, model.EncodeQuickReplyDMTemplate(shortcutID), "Ã¤Â¼ÂÃ¤Â¸Å¡Ã¥Â¿Â«Ã¦ÂÂ·Ã¥â€ºÅ¾Ã¥Â¤Â")
+		return s.handleAddSingleDMTemplate(ctx, msg.Chat.ID, model.EncodeQuickReplyDMTemplate(shortcutID), "企业快捷回复")
 	case pendingRemoveDMTpl:
 		removedTargets := resolveDMTemplateRemovals(text, s.settings.ListDMTemplates())
 		if len(removedTargets) == 0 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "Ã¦Â²Â¡Ã¦Å“â€°Ã¨Â¯â€ Ã¥Ë†Â«Ã¥Ë†Â°Ã¥ÂÂ¯Ã¥Ë†Â Ã©â„¢Â¤Ã§Å¡â€žÃ¨Â¯ÂÃ¦Å“Â¯Ã§Â¼â€“Ã¥ÂÂ·Ã¦Ë†â€“Ã¥â€ â€¦Ã¥Â®Â¹Ã£â‚¬â€š", s.dmTemplatesKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "没有识别到可删除的话术编号或内容。", s.dmTemplatesKeyboard())
 		}
 		removed, err := s.settings.RemoveDMTemplates(removedTargets)
 		if err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("Ã¥Â·Â²Ã¥Ë†Â Ã©â„¢Â¤ %d Ã¦ÂÂ¡Ã¨Â¯ÂÃ¦Å“Â¯Ã£â‚¬â€š\n\n%s", removed, s.dmTemplatesText()), s.dmTemplatesKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("已删除 %d 条话术。\n\n%s", removed, s.dmTemplatesText()), s.dmTemplatesKeyboard())
 	case pendingSetMaxLength:
 		maxLength, err := parseNonNegativeInt(text)
 		if err != nil || maxLength < 0 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â¤Ã‚Â§ÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã¢â‚¬Â¢Ã‚Â¿ÃƒÂ¥Ã‚ÂºÃ‚Â¦ÃƒÂ¥Ã‚Â¿Ã¢â‚¬Â¦ÃƒÂ©Ã‚Â¡Ã‚Â»ÃƒÂ¦Ã‹Å“Ã‚Â¯ÃƒÂ©Ã‚ÂÃ…Â¾ÃƒÂ¨Ã‚Â´Ã…Â¸ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â´ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.rulesKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "æœ€å¤§æ¶ˆæ¯é•¿åº¦å¿…é¡»æ˜¯éžè´Ÿæ•´æ•°ã€‚", s.rulesKeyboard())
 		}
 		if err := s.settings.SetMaxMessageLength(maxLength); err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â¤Ã‚Â§ÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã¢â‚¬Â¢Ã‚Â¿ÃƒÂ¥Ã‚ÂºÃ‚Â¦ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã¢â‚¬ÂºÃ‚Â´ÃƒÂ¦Ã¢â‚¬â€œÃ‚Â°ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\n"+s.rulesText(), s.rulesKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, "æœ€å¤§æ¶ˆæ¯é•¿åº¦å·²æ›´æ–°ã€‚\n\n"+s.rulesText(), s.rulesKeyboard())
 	case pendingSetMinLength:
 		minLength, err := parseNonNegativeInt(text)
 		if err != nil || minLength < 0 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã¢â‚¬Â¢Ã‚Â¿ÃƒÂ¥Ã‚ÂºÃ‚Â¦ÃƒÂ¥Ã‚Â¿Ã¢â‚¬Â¦ÃƒÂ©Ã‚Â¡Ã‚Â»ÃƒÂ¦Ã‹Å“Ã‚Â¯ÃƒÂ©Ã‚ÂÃ…Â¾ÃƒÂ¨Ã‚Â´Ã…Â¸ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â´ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.rulesKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "æœ€å°æ¶ˆæ¯é•¿åº¦å¿…é¡»æ˜¯éžè´Ÿæ•´æ•°ã€‚", s.rulesKeyboard())
 		}
 		if err := s.settings.SetMinMessageLength(minLength); err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã¢â‚¬Â¢Ã‚Â¿ÃƒÂ¥Ã‚ÂºÃ‚Â¦ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã¢â‚¬ÂºÃ‚Â´ÃƒÂ¦Ã¢â‚¬â€œÃ‚Â°ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\n"+s.rulesText(), s.rulesKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, "æœ€å°æ¶ˆæ¯é•¿åº¦å·²æ›´æ–°ã€‚\n\n"+s.rulesText(), s.rulesKeyboard())
 	case pendingSetMinAge:
 		days, err := parseNonNegativeInt(text)
 		if err != nil || days < 0 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‚Â¹Ã‚Â´ÃƒÂ©Ã‚Â¾Ã¢â‚¬Å¾ÃƒÂ¥Ã‚Â¿Ã¢â‚¬Â¦ÃƒÂ©Ã‚Â¡Ã‚Â»ÃƒÂ¦Ã‹Å“Ã‚Â¯ÃƒÂ©Ã‚ÂÃ…Â¾ÃƒÂ¨Ã‚Â´Ã…Â¸ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â´ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.rulesKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "æœ€å°è´¦å·å¹´é¾„å¿…é¡»æ˜¯éžè´Ÿæ•´æ•°ã€‚", s.rulesKeyboard())
 		}
 		if err := s.settings.SetMinAccountAgeDays(days); err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‚Â¹Ã‚Â´ÃƒÂ©Ã‚Â¾Ã¢â‚¬Å¾ÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã¢â‚¬ÂºÃ‚Â´ÃƒÂ¦Ã¢â‚¬â€œÃ‚Â°ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\n"+s.rulesText(), s.rulesKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, "è´¦å·å¹´é¾„è¿‡æ»¤å·²æ›´æ–°ã€‚\n\n"+s.rulesText(), s.rulesKeyboard())
 	case pendingAddChatIDs:
 		added, err := s.settings.AddMonitorChats(parseInt64Parts(text))
 		if err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã‚Â·Ã‚Â»ÃƒÂ¥Ã…Â Ã‚Â  %d ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚Â¬ÃƒÂ§Ã‚Â¾Ã‚Â¤ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\n%s", added, s.chatsText()), s.chatsKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("å·²æ·»åŠ  %d ä¸ªç›‘å¬ç¾¤ã€‚\n\n%s", added, s.chatsText()), s.chatsKeyboard())
 	case pendingRemoveChatIDs:
 		removed, err := s.settings.RemoveMonitorChats(parseInt64Parts(text))
 		if err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ§Ã‚Â§Ã‚Â»ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤ %d ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚Â¬ÃƒÂ§Ã‚Â¾Ã‚Â¤ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\n%s", removed, s.chatsText()), s.chatsKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("å·²ç§»é™¤ %d ä¸ªç›‘å¬ç¾¤ã€‚\n\n%s", removed, s.chatsText()), s.chatsKeyboard())
 	case pendingUnblockUsers:
 		removed, err := s.removeBlockedUsers(parseInt64Parts(text))
 		if err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ§Ã‚Â§Ã‚Â»ÃƒÂ¥Ã¢â‚¬Â¡Ã‚Âº %d ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\n%s", removed, s.blacklistText()), s.blacklistKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("å·²ç§»å‡º %d ä¸ªé»‘åå•ç”¨æˆ·ã€‚\n\n%s", removed, s.blacklistText()), s.blacklistKeyboard())
 	case pendingUnblockChats:
 		removed, err := s.removeBlockedChats(parseInt64Parts(text))
 		if err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ§Ã‚Â§Ã‚Â»ÃƒÂ¥Ã¢â‚¬Â¡Ã‚Âº %d ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢ÃƒÂ§Ã‚Â¾Ã‚Â¤ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\n%s", removed, s.blacklistText()), s.blacklistKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("å·²ç§»å‡º %d ä¸ªé»‘åå•ç¾¤ã€‚\n\n%s", removed, s.blacklistText()), s.blacklistKeyboard())
 	case pendingExportTime:
 		start, end, err := parseTimeRange(text)
 		if err != nil {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¶ÃƒÂ©Ã¢â‚¬â€Ã‚Â´ÃƒÂ¦Ã‚Â Ã‚Â¼ÃƒÂ¥Ã‚Â¼Ã‚ÂÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ¥Ã‚Â¯Ã‚Â¹ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\nÃƒÂ§Ã‚Â¤Ã‚ÂºÃƒÂ¤Ã‚Â¾Ã¢â‚¬Â¹: 09-28-12:00 | 09-28-18:30", s.cancelExportKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "æ—¶é—´æ ¼å¼ä¸å¯¹ã€‚\nç¤ºä¾‹: 09-28-12:00 | 09-28-18:30", s.cancelExportKeyboard())
 		}
 		s.setExportContext(msg.From.ID, exportContext{
 			filterType: exportByTime,
@@ -771,20 +771,20 @@ func (s *AdminService) handlePendingInput(ctx context.Context, msg *model.Messag
 			end:        end,
 		})
 		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf(
-			"ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ©Ã¢â€šÂ¬Ã¢â‚¬Â°ÃƒÂ¦Ã¢â‚¬Â¹Ã‚Â©ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¶ÃƒÂ©Ã¢â‚¬â€Ã‚Â´ÃƒÂ¦Ã‚Â®Ã‚ÂµÃƒÂ¯Ã‚Â¼Ã…Â¡\n%s ~ %s\n\nÃƒÂ¨Ã‚Â¯Ã‚Â·ÃƒÂ©Ã¢â€šÂ¬Ã¢â‚¬Â°ÃƒÂ¦Ã¢â‚¬Â¹Ã‚Â©ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¦Ã‚Â Ã‚Â¼ÃƒÂ¥Ã‚Â¼Ã‚ÂÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡",
+			"å·²é€‰æ‹©æ—¶é—´æ®µï¼š\n%s ~ %s\n\nè¯·é€‰æ‹©å¯¼å‡ºæ ¼å¼ã€‚",
 			start.Format("01-02 15:04"),
 			end.Format("01-02 15:04"),
 		), s.exportFormatKeyboard())
 	case pendingExportKeyword:
 		keywords := splitInputParts(text)
 		if len(keywords) == 0 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ¨Ã†â€™Ã‚Â½ÃƒÂ¤Ã‚Â¸Ã‚ÂºÃƒÂ§Ã‚Â©Ã‚ÂºÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.cancelExportKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "å…³é”®è¯ä¸èƒ½ä¸ºç©ºã€‚", s.cancelExportKeyboard())
 		}
 		s.setExportContext(msg.From.ID, exportContext{
 			filterType: exportByWords,
 			keywords:   keywords,
 		})
-		return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ©Ã¢â€šÂ¬Ã¢â‚¬Â°ÃƒÂ¦Ã¢â‚¬Â¹Ã‚Â©ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¯Ã‚Â¼Ã…Â¡"+strings.Join(keywords, ", ")+"\n\nÃƒÂ¨Ã‚Â¯Ã‚Â·ÃƒÂ©Ã¢â€šÂ¬Ã¢â‚¬Â°ÃƒÂ¦Ã¢â‚¬Â¹Ã‚Â©ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¦Ã‚Â Ã‚Â¼ÃƒÂ¥Ã‚Â¼Ã‚ÂÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.exportFormatKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, "å·²é€‰æ‹©å…³é”®è¯ï¼š"+strings.Join(keywords, ", ")+"\n\nè¯·é€‰æ‹©å¯¼å‡ºæ ¼å¼ã€‚", s.exportFormatKeyboard())
 	default:
 		return nil
 	}
@@ -792,30 +792,30 @@ func (s *AdminService) handlePendingInput(ctx context.Context, msg *model.Messag
 
 func (s *AdminService) handlePendingDMUpload(ctx context.Context, msg *model.Message) error {
 	if msg.Document == nil {
-		return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¨Ã‚Â¯Ã‚Â·ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚Â `.session` ÃƒÂ¦Ã‹â€ Ã¢â‚¬â€œ `.zip` ÃƒÂ¦Ã¢â‚¬â€œÃ¢â‚¬Â¡ÃƒÂ¤Ã‚Â»Ã‚Â¶ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.dmPoolKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, "è¯·å‘é€ `.session` æˆ– `.zip` æ–‡ä»¶ã€‚", s.dmPoolKeyboard())
 	}
 	if s.dmManager == nil {
-		return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ¦Ã‚Â²Ã‚Â¡ÃƒÂ¦Ã…â€œÃ¢â‚¬Â°ÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ§Ã‚Â®Ã‚Â¡ÃƒÂ§Ã‚ÂÃ¢â‚¬Â ÃƒÂ¥Ã¢â€žÂ¢Ã‚Â¨ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.dmPoolKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, "å½“å‰æ²¡æœ‰å¯ç”¨çš„ç§ä¿¡å·ç®¡ç†å™¨ã€‚", s.dmPoolKeyboard())
 	}
 
 	filename := strings.TrimSpace(msg.Document.FileName)
 	lowerName := strings.ToLower(filename)
 	if !strings.HasSuffix(lowerName, ".session") && !strings.HasSuffix(lowerName, ".zip") {
-		return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¦Ã¢â‚¬â€œÃ¢â‚¬Â¡ÃƒÂ¤Ã‚Â»Ã‚Â¶ÃƒÂ¦Ã‚Â Ã‚Â¼ÃƒÂ¥Ã‚Â¼Ã‚ÂÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ¦Ã¢â‚¬ÂÃ‚Â¯ÃƒÂ¦Ã…â€™Ã‚ÂÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¤Ã‚Â»Ã¢â‚¬Â¦ÃƒÂ¦Ã¢â‚¬ÂÃ‚Â¯ÃƒÂ¦Ã…â€™Ã‚Â `.session` ÃƒÂ¦Ã‹â€ Ã¢â‚¬â€œ `.zip`ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.dmPoolKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, "æ–‡ä»¶æ ¼å¼ä¸æ”¯æŒï¼Œä»…æ”¯æŒ `.session` æˆ– `.zip`ã€‚", s.dmPoolKeyboard())
 	}
 
 	downloader, ok := s.client.(fileDownloader)
 	if !ok {
-		return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚Â Bot API ÃƒÂ¥Ã‚Â®Ã‚Â¢ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ§Ã‚Â«Ã‚Â¯ÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ¦Ã¢â‚¬ÂÃ‚Â¯ÃƒÂ¦Ã…â€™Ã‚ÂÃƒÂ¤Ã‚Â¸Ã¢â‚¬Â¹ÃƒÂ¨Ã‚Â½Ã‚Â½ÃƒÂ¦Ã¢â‚¬â€œÃ¢â‚¬Â¡ÃƒÂ¤Ã‚Â»Ã‚Â¶ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.dmPoolKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, "å½“å‰ Bot API å®¢æˆ·ç«¯ä¸æ”¯æŒä¸‹è½½æ–‡ä»¶ã€‚", s.dmPoolKeyboard())
 	}
 
-	if err := s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã‚Â¼Ã¢â€šÂ¬ÃƒÂ¥Ã‚Â§Ã¢â‚¬Â¹ÃƒÂ¤Ã‚Â¸Ã¢â‚¬Â¹ÃƒÂ¨Ã‚Â½Ã‚Â½ÃƒÂ¥Ã‚Â¹Ã‚Â¶ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â¥ SessionÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¥Ã‚Â¤Ã…Â¡ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¶ÃƒÂ¤Ã‚Â¼Ã…Â¡ÃƒÂ§Ã‚Â¨Ã‚ÂÃƒÂ§Ã‚Â­Ã¢â‚¬Â°ÃƒÂ¤Ã‚Â¸Ã¢â€šÂ¬ÃƒÂ¤Ã‚Â¼Ã…Â¡ÃƒÂ¥Ã¢â‚¬Å¾Ã‚Â¿ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", nil); err != nil {
+	if err := s.client.SendMessage(ctx, msg.Chat.ID, "å¼€å§‹ä¸‹è½½å¹¶å¯¼å…¥ Sessionï¼Œæ•°é‡å¤šæ—¶ä¼šç¨ç­‰ä¸€ä¼šå„¿ã€‚", nil); err != nil {
 		return err
 	}
 
 	downloadedName, data, err := downloader.DownloadFile(ctx, msg.Document.FileID)
 	if err != nil {
-		return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¤Ã‚Â¸Ã¢â‚¬Â¹ÃƒÂ¨Ã‚Â½Ã‚Â½ÃƒÂ¦Ã¢â‚¬â€œÃ¢â‚¬Â¡ÃƒÂ¤Ã‚Â»Ã‚Â¶ÃƒÂ¥Ã‚Â¤Ã‚Â±ÃƒÂ¨Ã‚Â´Ã‚Â¥: "+err.Error(), s.dmPoolKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, "ä¸‹è½½æ–‡ä»¶å¤±è´¥: "+err.Error(), s.dmPoolKeyboard())
 	}
 	if strings.TrimSpace(filename) == "" {
 		filename = downloadedName
@@ -823,7 +823,7 @@ func (s *AdminService) handlePendingDMUpload(ctx context.Context, msg *model.Mes
 
 	result, err := s.dmManager.ImportDMSessions(ctx, filename, data)
 	if err != nil {
-		return s.client.SendMessage(ctx, msg.Chat.ID, "ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â¥ Session ÃƒÂ¥Ã‚Â¤Ã‚Â±ÃƒÂ¨Ã‚Â´Ã‚Â¥: "+err.Error(), s.dmPoolKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, "å¯¼å…¥ Session å¤±è´¥: "+err.Error(), s.dmPoolKeyboard())
 	}
 	return s.client.SendMessage(ctx, msg.Chat.ID, result+"\n\n"+s.dmPoolText(), s.dmPoolKeyboard())
 }
@@ -836,7 +836,7 @@ func (s *AdminService) mainText() string {
 
 	todaySent, todaySuccess, todayFailed := s.dmStatsToday()
 	return fmt.Sprintf(
-		"JTBot å…³é”®è¯ç›‘æŽ§æœºå™¨äºº\nç‰ˆæœ¬: %s\n\nðŸ“± ç›‘æŽ§è´¦å·: %dåœ¨çº¿ / %dç¦»çº¿\nðŸ”‘ å…³é”®è¯: %dä¸ª\nðŸ’¬ ç§ä¿¡è®°å½•: å‘é€ %d | æˆåŠŸ %d | å¤±è´¥ %d",
+		"🤖 JTBot 关键词监控机器人\n版本: %s\n\n📱 监控账号: %d在线 / %d离线\n🔑 关键词: %d个\n💬 私信记录: 发送 %d | 成功 %d | 失败 %d",
 		version.Current,
 		active,
 		total-active,
@@ -958,22 +958,22 @@ func (s *AdminService) dmConnectPrompt() string {
 }
 
 func (s *AdminService) dmUploadPrompt() string {
-	return "ÃƒÂ¨Ã‚Â¯Ã‚Â·ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚Â Telethon `.session` ÃƒÂ¦Ã¢â‚¬â€œÃ¢â‚¬Â¡ÃƒÂ¤Ã‚Â»Ã‚Â¶ÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¦Ã‹â€ Ã¢â‚¬â€œÃƒÂ¤Ã‚Â¸Ã¢â€šÂ¬ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ¥Ã…â€™Ã¢â‚¬Â¦ÃƒÂ¥Ã‚ÂÃ‚Â«ÃƒÂ¥Ã‚Â¤Ã…Â¡ÃƒÂ¤Ã‚Â¸Ã‚Âª `.session` ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ `.zip` ÃƒÂ¥Ã…Â½Ã¢â‚¬Â¹ÃƒÂ§Ã‚Â¼Ã‚Â©ÃƒÂ¥Ã…â€™Ã¢â‚¬Â¦ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡\n\nÃƒÂ¤Ã‚Â¸Ã…Â ÃƒÂ¤Ã‚Â¼Ã‚Â ÃƒÂ¥Ã‚ÂÃ…Â½ÃƒÂ¤Ã‚Â¼Ã…Â¡ÃƒÂ¨Ã¢â‚¬Â¡Ã‚ÂªÃƒÂ¥Ã…Â Ã‚Â¨ÃƒÂ¦Ã¢â‚¬Â°Ã‚Â¹ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â¥ÃƒÂ¥Ã‚Â¹Ã‚Â¶ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ¨Ã‚Â¯Ã¢â‚¬Â¢ÃƒÂ¦Ã¢â‚¬Â¹Ã¢â‚¬Â°ÃƒÂ¨Ã‚ÂµÃ‚Â·ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡"
+	return "è¯·å‘é€ Telethon `.session` æ–‡ä»¶ï¼Œæˆ–ä¸€ä¸ªåŒ…å«å¤šä¸ª `.session` çš„ `.zip` åŽ‹ç¼©åŒ…ã€‚\n\nä¸Šä¼ åŽä¼šè‡ªåŠ¨æ‰¹é‡å¯¼å…¥å¹¶å°è¯•æ‹‰èµ·ç§ä¿¡å·ã€‚"
 }
 
 func (s *AdminService) dmAccountsText() string {
 	accounts := s.listDMAccounts()
 	if len(accounts) == 0 {
-		return "ÃƒÂ¢Ã‚ÂÃ…â€™ ÃƒÂ¦Ã…Â¡Ã¢â‚¬Å¡ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·\n\nÃƒÂ§Ã¢â‚¬Å¡Ã‚Â¹ÃƒÂ¥Ã¢â‚¬Â¡Ã‚Â»ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¨Ã‚Â¿Ã…Â¾ÃƒÂ¦Ã…Â½Ã‚Â¥ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¦Ã¢â‚¬Â°Ã¢â‚¬Â¹ÃƒÂ¥Ã…Â Ã‚Â¨ÃƒÂ§Ã¢â€žÂ¢Ã‚Â»ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢ÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¦Ã‹â€ Ã¢â‚¬â€œÃƒÂ§Ã¢â‚¬Å¡Ã‚Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÂ¤Ã‚Â¸Ã…Â ÃƒÂ¤Ã‚Â¼Ã‚Â  SessionÃƒÂ¢Ã¢â€šÂ¬Ã‚ÂÃƒÂ¦Ã¢â‚¬Â°Ã‚Â¹ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â¥ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡"
+		return "âŒ æš‚æ— ç§ä¿¡å·\n\nç‚¹å‡»â€œè¿žæŽ¥ç§ä¿¡å·â€æ‰‹åŠ¨ç™»å½•ï¼Œæˆ–ç‚¹â€œä¸Šä¼  Sessionâ€æ‰¹é‡å¯¼å…¥ã€‚"
 	}
 
-	lines := []string{fmt.Sprintf("ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‹â€ Ã¢â‚¬â€ÃƒÂ¨Ã‚Â¡Ã‚Â¨ (%dÃƒÂ¤Ã‚Â¸Ã‚Âª)ÃƒÂ¯Ã‚Â¼Ã…Â¡", len(accounts)), ""}
+	lines := []string{fmt.Sprintf("ðŸ“‹ ç§ä¿¡å·åˆ—è¡¨ (%dä¸ª)ï¼š", len(accounts)), ""}
 	for i, account := range accounts {
-		status := "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â´ ÃƒÂ§Ã‚Â¦Ã‚Â»ÃƒÂ§Ã‚ÂºÃ‚Â¿"
+		status := "ðŸ”´ ç¦»çº¿"
 		if account.Online {
-			status = "ÃƒÂ°Ã…Â¸Ã…Â¸Ã‚Â¢ ÃƒÂ¥Ã…â€œÃ‚Â¨ÃƒÂ§Ã‚ÂºÃ‚Â¿"
+			status = "ðŸŸ¢ åœ¨çº¿"
 		}
-		line := fmt.Sprintf("%d. %s %s | ÃƒÂ¤Ã‚Â»Ã…Â ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¥ %d ÃƒÂ¦Ã‚ÂÃ‚Â¡", i+1, account.Phone, status, account.TodaySent)
+		line := fmt.Sprintf("%d. %s %s | ä»Šæ—¥ %d æ¡", i+1, account.Phone, status, account.TodaySent)
 		if account.LastError != "" && !account.Online {
 			line += " | " + account.LastError
 		}
@@ -985,36 +985,36 @@ func (s *AdminService) dmAccountsText() string {
 func (s *AdminService) dmAccountDetailText(phone string) (string, *model.InlineKeyboardMarkup, error) {
 	account, ok := s.dmManager.GetDMAccount(phone)
 	if !ok {
-		return "", nil, fmt.Errorf("ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ¥Ã‚Â­Ã‹Å“ÃƒÂ¥Ã…â€œÃ‚Â¨")
+		return "", nil, fmt.Errorf("ç§ä¿¡å·ä¸å­˜åœ¨")
 	}
 
-	status := "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â´ ÃƒÂ§Ã‚Â¦Ã‚Â»ÃƒÂ§Ã‚ÂºÃ‚Â¿"
+	status := "ðŸ”´ ç¦»çº¿"
 	if account.Online {
-		status = "ÃƒÂ°Ã…Â¸Ã…Â¸Ã‚Â¢ ÃƒÂ¥Ã…â€œÃ‚Â¨ÃƒÂ§Ã‚ÂºÃ‚Â¿"
+		status = "ðŸŸ¢ åœ¨çº¿"
 	}
-	text := fmt.Sprintf("ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã‚Â¬ ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¨Ã‚Â¯Ã‚Â¦ÃƒÂ¦Ã†â€™Ã¢â‚¬Â¦\n\nÃƒÂ¦Ã¢â‚¬Â°Ã¢â‚¬Â¹ÃƒÂ¦Ã…â€œÃ‚ÂºÃƒÂ¥Ã‚ÂÃ‚Â·: %s\nÃƒÂ§Ã…Â Ã‚Â¶ÃƒÂ¦Ã¢â€šÂ¬Ã‚Â: %s\nSession: %s\nÃƒÂ¤Ã‚Â»Ã…Â ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¥ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚Â: %d ÃƒÂ¦Ã‚ÂÃ‚Â¡\nÃƒÂ¤Ã‚Â»Ã…Â ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¥ÃƒÂ¦Ã‹â€ Ã‚ÂÃƒÂ¥Ã…Â Ã…Â¸: %d ÃƒÂ¦Ã‚ÂÃ‚Â¡\nÃƒÂ¤Ã‚Â»Ã…Â ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¥ÃƒÂ¥Ã‚Â¤Ã‚Â±ÃƒÂ¨Ã‚Â´Ã‚Â¥: %d ÃƒÂ¦Ã‚ÂÃ‚Â¡", account.Phone, status, filepathBase(account.SessionFile), account.TodaySent, account.TodaySuccess, account.TodayFailed)
+	text := fmt.Sprintf("ðŸ’¬ ç§ä¿¡å·è¯¦æƒ…\n\næ‰‹æœºå·: %s\nçŠ¶æ€: %s\nSession: %s\nä»Šæ—¥å‘é€: %d æ¡\nä»Šæ—¥æˆåŠŸ: %d æ¡\nä»Šæ—¥å¤±è´¥: %d æ¡", account.Phone, status, filepathBase(account.SessionFile), account.TodaySent, account.TodaySuccess, account.TodayFailed)
 	if strings.TrimSpace(account.LastError) != "" {
-		text += "\nÃƒÂ©Ã¢â‚¬ÂÃ¢â€žÂ¢ÃƒÂ¨Ã‚Â¯Ã‚Â¯: " + account.LastError
+		text += "\né”™è¯¯: " + account.LastError
 	}
 	if label := dmStatusLabel(account.StatusCode); label != "" {
-		text += "\nÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶: " + label
+		text += "\nè´¦å·é™åˆ¶: " + label
 	}
 	if strings.TrimSpace(account.StatusSummary) != "" {
-		text += "\nSpamBot ÃƒÂ¦Ã‚Â£Ã¢â€šÂ¬ÃƒÂ¦Ã‚ÂµÃ¢â‚¬Â¹: " + account.StatusSummary
+		text += "\nSpamBot æ£€æµ‹: " + account.StatusSummary
 		if !account.StatusCheckedAt.IsZero() {
-			text += "\nÃƒÂ¦Ã‚Â£Ã¢â€šÂ¬ÃƒÂ¦Ã‚ÂµÃ¢â‚¬Â¹ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¶ÃƒÂ©Ã¢â‚¬â€Ã‚Â´: " + account.StatusCheckedAt.Format("2006-01-02 15:04:05")
+			text += "\næ£€æµ‹æ—¶é—´: " + account.StatusCheckedAt.Format("2006-01-02 15:04:05")
 		}
 	}
 
 	keyboard := &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ…Â½ ÃƒÂ¦Ã‚Â£Ã¢â€šÂ¬ÃƒÂ¦Ã…Â¸Ã‚Â¥ÃƒÂ§Ã…Â Ã‚Â¶ÃƒÂ¦Ã¢â€šÂ¬Ã‚Â", CallbackData: callbackDMCheckPrefix + account.Phone},
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬Å¾ ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¦Ã¢â‚¬â€œÃ‚Â°ÃƒÂ¨Ã‚Â¿Ã…Â¾ÃƒÂ¦Ã…Â½Ã‚Â¥", CallbackData: callbackDMRetryPrefix + account.Phone},
+				{Text: "ðŸ”Ž æ£€æŸ¥çŠ¶æ€", CallbackData: callbackDMCheckPrefix + account.Phone},
+				{Text: "ðŸ”„ é‡æ–°è¿žæŽ¥", CallbackData: callbackDMRetryPrefix + account.Phone},
 			},
 			{
-				{Text: "ÃƒÂ¢Ã‚ÂÃ…â€™ ÃƒÂ¥Ã‹â€ Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·", CallbackData: callbackDMDeletePrefix + account.Phone},
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾ÃƒÂ¥Ã‹â€ Ã¢â‚¬â€ÃƒÂ¨Ã‚Â¡Ã‚Â¨", CallbackData: callbackDMList},
+				{Text: "âŒ åˆ é™¤è´¦å·", CallbackData: callbackDMDeletePrefix + account.Phone},
+				{Text: "ðŸ”™ è¿”å›žåˆ—è¡¨", CallbackData: callbackDMList},
 			},
 		},
 	}
@@ -1025,26 +1025,26 @@ func (s *AdminService) dmTemplatesText() string {
 	templates := s.settings.ListDMTemplates()
 	if len(templates) == 0 {
 		return strings.Join([]string{
-			"Ã°Å¸â€œÂ Ã¦Å¡â€šÃ¦â€”Â Ã§Â§ÂÃ¤Â¿Â¡Ã¨Â¯ÂÃ¦Å“Â¯Ã¦Â¨Â¡Ã¦ÂÂ¿",
+			"📝 暂无私信话术模板",
 			"",
-			"Ã¦â€“Â°Ã¥Â¢Å¾Ã¥Ââ€˜Ã©â‚¬ÂÃ¦Â¨Â¡Ã¥Â¼ÂÃ¯Â¼Å¡",
-			"Ã°Å¸â€Â´ Ã¦â€“â€¡Ã¦Å“Â¬Ã§â€ºÂ´Ã¥Ââ€˜: 0 Ã¦ÂÂ¡",
-			"Ã°Å¸â€Â´ Ã¥â€ â€¦Ã¨Ââ€Bot @PostBot: 0 Ã¦ÂÂ¡",
-			"Ã°Å¸â€Â´ Ã©Â¢â€˜Ã©Ââ€œÃ¨Â´Â´Ã¦â€“â€¡Ã¨Â½Â¬Ã¥Ââ€˜: 0 Ã¦ÂÂ¡",
-			"Ã°Å¸â€Â´ Ã©Å¡ÂÃ¨â€”ÂÃ¨Â½Â¬Ã¥Ââ€˜Ã¦ÂÂ¥Ã¦ÂºÂ: 0 Ã¦ÂÂ¡",
-			"Ã°Å¸â€Â´ Ã¤Â¼ÂÃ¤Â¸Å¡Ã¥Â¿Â«Ã¦ÂÂ·Ã¥â€ºÅ¾Ã¥Â¤Â: 0 Ã¦ÂÂ¡",
+			"新增发送模式：",
+			"🔴 文本直发: 0 条",
+			"🔴 内联Bot @PostBot: 0 条",
+			"🔴 频道贴文转发: 0 条",
+			"🔴 隐藏转发来源: 0 条",
+			"🔴 企业快捷回复: 0 条",
 		}, "\n")
 	}
 
 	counts := countDMTemplateModes(templates)
 	lines := []string{
-		fmt.Sprintf("Ã°Å¸â€œÂ Ã¨Â¯ÂÃ¦Å“Â¯Ã¦Â¨Â¡Ã¦ÂÂ¿ (%dÃ¦ÂÂ¡)Ã¯Â¼Å¡", len(templates)),
+		fmt.Sprintf("📝 话术模板 (%d条)：", len(templates)),
 		"",
-		fmt.Sprintf("Ã°Å¸â€Â´ Ã¦â€“â€¡Ã¦Å“Â¬Ã§â€ºÂ´Ã¥Ââ€˜: %d Ã¦ÂÂ¡", counts[model.DMTemplateModeText]),
-		fmt.Sprintf("Ã°Å¸â€Â´ Ã¥â€ â€¦Ã¨Ââ€Bot @PostBot: %d Ã¦ÂÂ¡", counts[model.DMTemplateModePostBot]),
-		fmt.Sprintf("Ã°Å¸â€Â´ Ã©Â¢â€˜Ã©Ââ€œÃ¨Â´Â´Ã¦â€“â€¡Ã¨Â½Â¬Ã¥Ââ€˜: %d Ã¦ÂÂ¡", counts[model.DMTemplateModeForward]),
-		fmt.Sprintf("Ã°Å¸â€Â´ Ã©Å¡ÂÃ¨â€”ÂÃ¨Â½Â¬Ã¥Ââ€˜Ã¦ÂÂ¥Ã¦ÂºÂ: %d Ã¦ÂÂ¡", counts[model.DMTemplateModeForwardHidden]),
-		fmt.Sprintf("Ã°Å¸â€Â´ Ã¤Â¼ÂÃ¤Â¸Å¡Ã¥Â¿Â«Ã¦ÂÂ·Ã¥â€ºÅ¾Ã¥Â¤Â: %d Ã¦ÂÂ¡", counts[model.DMTemplateModeQuickReply]),
+		fmt.Sprintf("🔴 文本直发: %d 条", counts[model.DMTemplateModeText]),
+		fmt.Sprintf("🔴 内联Bot @PostBot: %d 条", counts[model.DMTemplateModePostBot]),
+		fmt.Sprintf("🔴 频道贴文转发: %d 条", counts[model.DMTemplateModeForward]),
+		fmt.Sprintf("🔴 隐藏转发来源: %d 条", counts[model.DMTemplateModeForwardHidden]),
+		fmt.Sprintf("🔴 企业快捷回复: %d 条", counts[model.DMTemplateModeQuickReply]),
 		"",
 	}
 	for i, item := range templates {
@@ -1055,40 +1055,40 @@ func (s *AdminService) dmTemplatesText() string {
 
 func (s *AdminService) dmTemplateAddPrompt() string {
 	return strings.Join([]string{
-		"Ã¥Ââ€˜Ã©â‚¬ÂÃ¨Â¦ÂÃ¦Â·Â»Ã¥Å Â Ã§Å¡â€žÃ¨Â¯ÂÃ¦Å“Â¯Ã¯Â¼Å’Ã¥Â¤Å¡Ã¦ÂÂ¡Ã¥ÂÂ¯Ã§â€Â¨ --- Ã¥Ë†â€ Ã©Å¡â€Ã£â‚¬â€š",
+		"发送要添加的话术，多条可用 --- 分隔。",
 		"",
-		"Ã¦â€Â¯Ã¦Å’ÂÃ¨Â¿â„¢Ã¥â€¡Â Ã§Â§ÂÃ¦Â Â¼Ã¥Â¼ÂÃ¯Â¼Å¡",
-		"1. Ã¦â€“â€¡Ã¦Å“Â¬Ã§â€ºÂ´Ã¥Ââ€˜Ã¯Â¼Å¡Ã§â€ºÂ´Ã¦Å½Â¥Ã¨Â¾â€œÃ¥â€¦Â¥Ã¥â€ â€¦Ã¥Â®Â¹Ã¯Â¼Å’Ã¦Ë†â€“Ã§â€Â¨ Ã¦â€“â€¡Ã¦Å“Â¬::Ã¥â€ â€¦Ã¥Â®Â¹",
-		"2. Ã¥â€ â€¦Ã¨Ââ€BotÃ¯Â¼Å¡PostBot::Ã¤Â»Â£Ã§Â Â",
-		"3. Ã©Â¢â€˜Ã©Ââ€œÃ¨Â´Â´Ã¦â€“â€¡Ã¨Â½Â¬Ã¥Ââ€˜Ã¯Â¼Å¡Ã¨Â½Â¬Ã¥Ââ€˜::https://t.me/Ã©Â¢â€˜Ã©Ââ€œ/123",
-		"4. Ã©Å¡ÂÃ¨â€”ÂÃ¨Â½Â¬Ã¥Ââ€˜Ã¦ÂÂ¥Ã¦ÂºÂÃ¯Â¼Å¡Ã©Å¡ÂÃ¨â€”ÂÃ¨Â½Â¬Ã¥Ââ€˜::https://t.me/Ã©Â¢â€˜Ã©Ââ€œ/123",
-		"5. Ã¤Â¼ÂÃ¤Â¸Å¡Ã¥Â¿Â«Ã¦ÂÂ·Ã¥â€ºÅ¾Ã¥Â¤ÂÃ¯Â¼Å¡Ã¥Â¿Â«Ã¦ÂÂ·Ã¥â€ºÅ¾Ã¥Â¤Â::123",
+		"支持这几种格式：",
+		"1. 文本直发：直接输入内容，或用 文本::内容",
+		"2. 内联Bot：PostBot::代码",
+		"3. 频道贴文转发：转发::https://t.me/频道/123",
+		"4. 隐藏转发来源：隐藏转发::https://t.me/频道/123",
+		"5. 企业快捷回复：快捷回复::123",
 	}, "\n")
 }
 
 func (s *AdminService) dmTemplateTextPrompt() string {
-	return "Ã¥Ââ€˜Ã©â‚¬ÂÃ¦â€“â€¡Ã¦Å“Â¬Ã§Â§ÂÃ¤Â¿Â¡Ã¥â€ â€¦Ã¥Â®Â¹Ã£â‚¬â€š\n\nÃ¦â€Â¯Ã¦Å’ÂÃ¥ÂËœÃ©â€¡ÂÃ¯Â¼Å¡{username} {chat_title} {keywords} {message}"
+	return "发送文本私信内容。\n\n支持变量：{username} {chat_title} {keywords} {message}"
 }
 
 func (s *AdminService) dmTemplatePostBotPrompt() string {
-	return "Ã¥Ââ€˜Ã©â‚¬Â PostBot Ã§Å¡â€žÃ¥â€ â€¦Ã¨Ââ€Ã¤Â»Â£Ã§Â ÂÃ£â‚¬â€š\n\nÃ¤Â¾â€¹Ã¥Â¦â€šÃ¯Â¼Å¡abc123"
+	return "发送 PostBot 的内联代码。\n\n例如：abc123"
 }
 
 func (s *AdminService) dmTemplateForwardPrompt(hidden bool) string {
 	if hidden {
-		return "Ã¥Ââ€˜Ã©â‚¬ÂÃ¨Â¦ÂÃ©Å¡ÂÃ¨â€”ÂÃ¦ÂÂ¥Ã¦ÂºÂÃ¨Â½Â¬Ã¥Ââ€˜Ã§Å¡â€žÃ©Â¢â€˜Ã©Ââ€œÃ¨Â´Â´Ã¦â€“â€¡Ã©â€œÂ¾Ã¦Å½Â¥Ã£â‚¬â€š\n\nÃ¤Â¾â€¹Ã¥Â¦â€šÃ¯Â¼Å¡https://t.me/channelname/123"
+		return "发送要隐藏来源转发的频道贴文链接。\n\n例如：https://t.me/channelname/123"
 	}
-	return "Ã¥Ââ€˜Ã©â‚¬ÂÃ¨Â¦ÂÃ¨Â½Â¬Ã¥Ââ€˜Ã§Å¡â€žÃ©Â¢â€˜Ã©Ââ€œÃ¨Â´Â´Ã¦â€“â€¡Ã©â€œÂ¾Ã¦Å½Â¥Ã£â‚¬â€š\n\nÃ¤Â¾â€¹Ã¥Â¦â€šÃ¯Â¼Å¡https://t.me/channelname/123"
+	return "发送要转发的频道贴文链接。\n\n例如：https://t.me/channelname/123"
 }
 
 func (s *AdminService) dmTemplateQuickReplyPrompt() string {
-	return "Ã¥Ââ€˜Ã©â‚¬ÂÃ¤Â¼ÂÃ¤Â¸Å¡Ã¥Â¿Â«Ã¦ÂÂ·Ã¥â€ºÅ¾Ã¥Â¤Â IDÃ£â‚¬â€š\n\nÃ¤Â¾â€¹Ã¥Â¦â€šÃ¯Â¼Å¡123"
+	return "发送企业快捷回复 ID。\n\n例如：123"
 }
 
 func (s *AdminService) handleAddSingleDMTemplate(ctx context.Context, chatID int64, encoded, label string) error {
 	encoded = strings.TrimSpace(encoded)
 	if encoded == "" {
-		return s.client.SendMessage(ctx, chatID, "Ã¥â€ â€¦Ã¥Â®Â¹Ã¤Â¸ÂÃ¨Æ’Â½Ã¤Â¸ÂºÃ§Â©ÂºÃ£â‚¬â€š", s.dmTemplateModeKeyboard())
+		return s.client.SendMessage(ctx, chatID, "内容不能为空。", s.dmTemplateModeKeyboard())
 	}
 	added, err := s.settings.AddDMTemplates([]string{encoded})
 	if err != nil {
@@ -1097,20 +1097,20 @@ func (s *AdminService) handleAddSingleDMTemplate(ctx context.Context, chatID int
 	if added > 0 {
 		_ = s.settings.SetDMTemplate(encoded)
 	}
-	return s.client.SendMessage(ctx, chatID, fmt.Sprintf("Ã¥Â·Â²Ã¦Â·Â»Ã¥Å Â  %s Ã¨Â¯ÂÃ¦Å“Â¯Ã£â‚¬â€š\n\n%s", label, s.dmTemplatesText()), s.dmTemplatesKeyboard())
+	return s.client.SendMessage(ctx, chatID, fmt.Sprintf("已添加 %s 话术。\n\n%s", label, s.dmTemplatesText()), s.dmTemplatesKeyboard())
 }
 
 func (s *AdminService) dmRecordsText() string {
 	records := s.recordStore.DMRecords()
 	if len(records) == 0 {
-		return "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¨ ÃƒÂ¦Ã…Â¡Ã¢â‚¬Å¡ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¨Ã‚Â®Ã‚Â°ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢"
+		return "ðŸ“¨ æš‚æ— ç§ä¿¡è®°å½•"
 	}
 
 	todaySent, todaySuccess, todayFailed := s.dmStatsToday()
 	lines := []string{
-		fmt.Sprintf("ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¨ ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¨Ã‚Â®Ã‚Â°ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢\n\nÃƒÂ¤Ã‚Â»Ã…Â ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¥ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚Â: %d | ÃƒÂ¦Ã‹â€ Ã‚ÂÃƒÂ¥Ã…Â Ã…Â¸ %d | ÃƒÂ¥Ã‚Â¤Ã‚Â±ÃƒÂ¨Ã‚Â´Ã‚Â¥ %d", todaySent, todaySuccess, todayFailed),
+		fmt.Sprintf("ðŸ“¨ ç§ä¿¡è®°å½•\n\nä»Šæ—¥å‘é€: %d | æˆåŠŸ %d | å¤±è´¥ %d", todaySent, todaySuccess, todayFailed),
 		"",
-		"ÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¨Ã‚Â¿Ã¢â‚¬Ëœ 10 ÃƒÂ¦Ã‚ÂÃ‚Â¡ÃƒÂ¯Ã‚Â¼Ã…Â¡",
+		"æœ€è¿‘ 10 æ¡ï¼š",
 	}
 	start := len(records) - 10
 	if start < 0 {
@@ -1126,7 +1126,7 @@ func (s *AdminService) dmRecordsText() string {
 		if strings.TrimSpace(senderLabel) == "" {
 			senderLabel = "-"
 		}
-		line := fmt.Sprintf("ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ %s | %s | via %s", target, record.Status, senderLabel)
+		line := fmt.Sprintf("â€¢ %s | %s | via %s", target, record.Status, senderLabel)
 		if strings.TrimSpace(record.Error) != "" {
 			line += " | " + record.Error
 		}
@@ -1138,7 +1138,7 @@ func (s *AdminService) dmRecordsText() string {
 func (s *AdminService) dmSettingsText() string {
 	state := s.settings.Snapshot()
 	return fmt.Sprintf(
-		"ÃƒÂ¢Ã…Â¡Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¸Ã‚Â ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¨Ã‚Â®Ã‚Â¾ÃƒÂ§Ã‚Â½Ã‚Â®\n\nÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¶ÃƒÂ©Ã¢â‚¬â€Ã‚Â´: %d ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã¢â‚¬â„¢Ã…Â¸\nÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ¥Ã‚Â¼Ã‚Â: %s\nÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ©Ã‚Â»Ã‹Å“ÃƒÂ¨Ã‚Â®Ã‚Â¤ÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ¦Ã‚ÂÃ‚Â¿:\n%s",
+		"âš™ï¸ ç§ä¿¡å‘é€è®¾ç½®\n\nå†·å´æ—¶é—´: %d åˆ†é’Ÿ\nå‘é€æ¨¡å¼: %s\nå½“å‰é»˜è®¤æ¨¡æ¿:\n%s",
 		state.CooldownMinutes,
 		dryRunLabel(state.DryRun),
 		state.DMTemplate,
@@ -1148,66 +1148,66 @@ func (s *AdminService) dmSettingsText() string {
 func (s *AdminService) exportText() string {
 	total := len(s.recordStore.MatchRecords())
 	return fmt.Sprintf(
-		"ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¤ ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ¦Ã‚ÂÃ‚Â®ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚Âº\n\nÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ¥Ã¢â‚¬ËœÃ‚Â½ÃƒÂ¤Ã‚Â¸Ã‚Â­ÃƒÂ¨Ã‚Â®Ã‚Â°ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢: %d ÃƒÂ¦Ã‚ÂÃ‚Â¡\n\nÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¯Ã‚Â¼Ã…Â¡\nÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ ÃƒÂ¦Ã…â€™Ã¢â‚¬Â°ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¶ÃƒÂ©Ã¢â‚¬â€Ã‚Â´ÃƒÂ¦Ã‚Â®Ã‚ÂµÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚Âº\nÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ ÃƒÂ¦Ã…â€™Ã¢â‚¬Â°ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚Âº\nÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â¨ÃƒÂ©Ã†â€™Ã‚Â¨ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ¦Ã‚ÂÃ‚Â®",
+		"ðŸ“¤ æ•°æ®å¯¼å‡º\n\nå½“å‰å‘½ä¸­è®°å½•: %d æ¡\n\nå¯å¯¼å‡ºï¼š\nâ€¢ æŒ‰æ—¶é—´æ®µå¯¼å‡º\nâ€¢ æŒ‰å…³é”®è¯å¯¼å‡º\nâ€¢ å¯¼å‡ºå…¨éƒ¨æ•°æ®",
 		total,
 	)
 }
 
 func (s *AdminService) exportTimePrompt() string {
-	return "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¦ ÃƒÂ¦Ã…â€™Ã¢â‚¬Â°ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¶ÃƒÂ©Ã¢â‚¬â€Ã‚Â´ÃƒÂ¦Ã‚Â®Ã‚ÂµÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚Âº\n\nÃƒÂ¨Ã‚Â¯Ã‚Â·ÃƒÂ¨Ã‚Â¾Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â¥ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¶ÃƒÂ©Ã¢â‚¬â€Ã‚Â´ÃƒÂ¨Ã…â€™Ã†â€™ÃƒÂ¥Ã¢â‚¬ÂºÃ‚Â´ÃƒÂ¯Ã‚Â¼Ã…Â¡\nÃƒÂ§Ã‚Â¤Ã‚ÂºÃƒÂ¤Ã‚Â¾Ã¢â‚¬Â¹ 1: 09-28-12:00 | 09-28-18:30\nÃƒÂ§Ã‚Â¤Ã‚ÂºÃƒÂ¤Ã‚Â¾Ã¢â‚¬Â¹ 2: 2026-09-28 12:00 | 2026-09-28 18:30"
+	return "ðŸ“… æŒ‰æ—¶é—´æ®µå¯¼å‡º\n\nè¯·è¾“å…¥æ—¶é—´èŒƒå›´ï¼š\nç¤ºä¾‹ 1: 09-28-12:00 | 09-28-18:30\nç¤ºä¾‹ 2: 2026-09-28 12:00 | 2026-09-28 18:30"
 }
 
 func (s *AdminService) exportKeywordPrompt() string {
 	keywords := s.keywordStore.List()
-	return "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬Ëœ ÃƒÂ¦Ã…â€™Ã¢â‚¬Â°ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚Âº\n\nÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¯Ã‚Â¼Ã…Â¡\n" + strings.Join(keywords, " | ") + "\n\nÃƒÂ¨Ã‚Â¯Ã‚Â·ÃƒÂ¨Ã‚Â¾Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â¥ÃƒÂ¨Ã‚Â¦Ã‚ÂÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã‚Â¤Ã…Â¡ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ | ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã…Â¡Ã¢â‚¬ÂÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡"
+	return "ðŸ”‘ æŒ‰å…³é”®è¯å¯¼å‡º\n\nå½“å‰å…³é”®è¯ï¼š\n" + strings.Join(keywords, " | ") + "\n\nè¯·è¾“å…¥è¦å¯¼å‡ºçš„å…³é”®è¯ï¼Œå¤šä¸ªç”¨ | åˆ†éš”ã€‚"
 }
 
 func (s *AdminService) legacyRulesText() string {
 	state := s.settings.Snapshot()
-	alertChat := "ÃƒÂ¦Ã…â€œÃ‚ÂªÃƒÂ¨Ã‚Â®Ã‚Â¾ÃƒÂ§Ã‚Â½Ã‚Â®"
+	alertChat := "æœªè®¾ç½®"
 	if state.AlertChatID != 0 {
 		alertChat = strconv.FormatInt(state.AlertChatID, 10)
 	}
 	return fmt.Sprintf(
-		"ÃƒÂ¢Ã…Â¡Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¸Ã‚Â ÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤ÃƒÂ¨Ã‚Â®Ã‚Â¾ÃƒÂ§Ã‚Â½Ã‚Â®\n\nÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¦Ã…Â½Ã‚Â§ÃƒÂ¥Ã‚Â¼Ã¢â€šÂ¬ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³: %s\nÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¶ÃƒÂ©Ã¢â‚¬â€Ã‚Â´: %d ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã¢â‚¬â„¢Ã…Â¸\nÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ¥Ã‚Â¼Ã‚Â: %s\nÃƒÂ©Ã¢â€šÂ¬Ã…Â¡ÃƒÂ§Ã…Â¸Ã‚Â¥ÃƒÂ§Ã‚Â¾Ã‚Â¤: %s\nÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â¤Ã‚Â§ÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã¢â‚¬Â¢Ã‚Â¿ÃƒÂ¥Ã‚ÂºÃ‚Â¦: %s\nÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â: %s\nÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ¥Ã‚Â¤Ã‚Â´ÃƒÂ¥Ã†â€™Ã‚Â: %s\nÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‚Â¹Ã‚Â´ÃƒÂ©Ã‚Â¾Ã¢â‚¬Å¾: %s ÃƒÂ¥Ã‚Â¤Ã‚Â©\nÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ¦Ã‚ÂÃ‚Â¿:\n%s",
+		"âš™ï¸ è¿‡æ»¤è®¾ç½®\n\nç›‘æŽ§å¼€å…³: %s\nå†·å´æ—¶é—´: %d åˆ†é’Ÿ\nå‘é€æ¨¡å¼: %s\né€šçŸ¥ç¾¤: %s\næœ€å¤§æ¶ˆæ¯é•¿åº¦: %s\nè¿‡æ»¤æ— ç”¨æˆ·å: %s\nè¿‡æ»¤æ— å¤´åƒ: %s\næœ€å°è´¦å·å¹´é¾„: %s å¤©\nç§ä¿¡æ¨¡æ¿:\n%s",
 		onOff(state.MonitoringEnabled),
 		state.CooldownMinutes,
 		dryRunLabel(state.DryRun),
 		alertChat,
-		formatOptionalNumber(state.MaxMessageLength, "ÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ©Ã¢â€žÂ¢Ã‚Â"),
+		formatOptionalNumber(state.MaxMessageLength, "ä¸é™"),
 		onOff(state.FilterNoUsername),
 		onOff(state.FilterNoAvatar),
-		formatOptionalNumber(state.MinAccountAgeDays, "ÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ©Ã¢â€žÂ¢Ã‚Â"),
+		formatOptionalNumber(state.MinAccountAgeDays, "ä¸é™"),
 		state.DMTemplate,
 	)
 }
 
 func (s *AdminService) rulesText() string {
 	state := s.settings.Snapshot()
-	alertChat := "ÃƒÂ¦Ã…â€œÃ‚ÂªÃƒÂ¨Ã‚Â®Ã‚Â¾ÃƒÂ§Ã‚Â½Ã‚Â®"
+	alertChat := "æœªè®¾ç½®"
 	if state.AlertChatID != 0 {
 		alertChat = strconv.FormatInt(state.AlertChatID, 10)
 	}
 	return fmt.Sprintf(
-		"ÃƒÂ¢Ã…Â¡Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¸Ã‚Â ÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤ÃƒÂ¨Ã‚Â®Ã‚Â¾ÃƒÂ§Ã‚Â½Ã‚Â®\n\nÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¦Ã…Â½Ã‚Â§ÃƒÂ¥Ã‚Â¼Ã¢â€šÂ¬ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³: %s\nÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¥Ã‚Â¤Ã‚ÂÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´: %d ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã¢â‚¬â„¢Ã…Â¸\nÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ§Ã‚Â¾Ã‚Â¤ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¥Ã‚Â¤Ã‚ÂÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´: %s ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã¢â‚¬â„¢Ã…Â¸\nÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ¥Ã¢â‚¬Â Ã¢â‚¬Â¦ÃƒÂ¥Ã‚Â®Ã‚Â¹ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¥Ã‚Â¤Ã‚ÂÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´: %s ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â ÃƒÂ©Ã¢â‚¬â„¢Ã…Â¸\nÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ¥Ã‚Â¼Ã‚Â: %s\nÃƒÂ©Ã¢â€šÂ¬Ã…Â¡ÃƒÂ§Ã…Â¸Ã‚Â¥ÃƒÂ§Ã‚Â¾Ã‚Â¤: %s\nÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã¢â‚¬Â¢Ã‚Â¿ÃƒÂ¥Ã‚ÂºÃ‚Â¦: %s\nÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â¤Ã‚Â§ÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã¢â‚¬Â¢Ã‚Â¿ÃƒÂ¥Ã‚ÂºÃ‚Â¦: %s\nÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â: %s\nÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ¥Ã‚Â¤Ã‚Â´ÃƒÂ¥Ã†â€™Ã‚Â: %s\nÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‚Â¹Ã‚Â´ÃƒÂ©Ã‚Â¾Ã¢â‚¬Å¾: %s ÃƒÂ¥Ã‚Â¤Ã‚Â©\nÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ¦Ã‚ÂÃ‚Â¿:\n%s",
+		"âš™ï¸ è¿‡æ»¤è®¾ç½®\n\nç›‘æŽ§å¼€å…³: %s\nåŒç”¨æˆ·é‡å¤ç§ä¿¡å†·å´: %d åˆ†é’Ÿ\nåŒç¾¤é‡å¤ç§ä¿¡å†·å´: %s åˆ†é’Ÿ\nåŒå†…å®¹é‡å¤ç§ä¿¡å†·å´: %s åˆ†é’Ÿ\nå‘é€æ¨¡å¼: %s\né€šçŸ¥ç¾¤: %s\næœ€å°æ¶ˆæ¯é•¿åº¦: %s\næœ€å¤§æ¶ˆæ¯é•¿åº¦: %s\nè¿‡æ»¤æ— ç”¨æˆ·å: %s\nè¿‡æ»¤æ— å¤´åƒ: %s\næœ€å°è´¦å·å¹´é¾„: %s å¤©\nç§ä¿¡æ¨¡æ¿:\n%s",
 		onOff(state.MonitoringEnabled),
 		state.CooldownMinutes,
-		formatOptionalNumber(state.ChatCooldownMinutes, "ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬â€Ã‚Â­"),
-		formatOptionalNumber(state.TextCooldownMinutes, "ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬â€Ã‚Â­"),
+		formatOptionalNumber(state.ChatCooldownMinutes, "å…³é—­"),
+		formatOptionalNumber(state.TextCooldownMinutes, "å…³é—­"),
 		dryRunLabel(state.DryRun),
 		alertChat,
-		formatOptionalNumber(state.MinMessageLength, "ÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶"),
-		formatOptionalNumber(state.MaxMessageLength, "ÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶"),
+		formatOptionalNumber(state.MinMessageLength, "ä¸é™åˆ¶"),
+		formatOptionalNumber(state.MaxMessageLength, "ä¸é™åˆ¶"),
 		onOff(state.FilterNoUsername),
 		onOff(state.FilterNoAvatar),
-		formatOptionalNumber(state.MinAccountAgeDays, "ÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶"),
+		formatOptionalNumber(state.MinAccountAgeDays, "ä¸é™åˆ¶"),
 		state.DMTemplate,
 	)
 }
 
 func (s *AdminService) chatsText() string {
 	state := s.settings.Snapshot()
-	body := "ÃƒÂ¦Ã…Â¡Ã¢â‚¬Å¡ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚Â¬ÃƒÂ§Ã‚Â¾Ã‚Â¤"
+	body := "æš‚æ— ç›‘å¬ç¾¤"
 	if len(state.MonitorChatIDs) > 0 {
 		parts := make([]string, 0, len(state.MonitorChatIDs))
 		for _, id := range state.MonitorChatIDs {
@@ -1215,16 +1215,16 @@ func (s *AdminService) chatsText() string {
 		}
 		body = strings.Join(parts, "\n")
 	}
-	return fmt.Sprintf("ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ¢â‚¬Å¡ ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚Â¬ÃƒÂ§Ã‚Â¾Ã‚Â¤ÃƒÂ©Ã¢â‚¬Â¦Ã‚ÂÃƒÂ§Ã‚Â½Ã‚Â®\n\nÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â± %d ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ¯Ã‚Â¼Ã…Â¡\n%s", len(state.MonitorChatIDs), body)
+	return fmt.Sprintf("ðŸ‘‚ ç›‘å¬ç¾¤é…ç½®\n\nå½“å‰å…± %d ä¸ªï¼š\n%s", len(state.MonitorChatIDs), body)
 }
 
 func (s *AdminService) blacklistText() string {
 	if s.blacklist == nil {
-		return "ÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢ÃƒÂ¦Ã…â€œÃ‚ÂªÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨"
+		return "é»‘åå•æœªå¯ç”¨"
 	}
 
 	users := s.blacklist.Users()
-	userBody := "ÃƒÂ¦Ã…Â¡Ã¢â‚¬Å¡ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·"
+	userBody := "æš‚æ— é»‘åå•ç”¨æˆ·"
 	if len(users) > 0 {
 		parts := make([]string, 0, len(users))
 		for _, user := range users {
@@ -1238,7 +1238,7 @@ func (s *AdminService) blacklistText() string {
 	}
 
 	chats := s.blacklist.Chats()
-	chatBody := "ÃƒÂ¦Ã…Â¡Ã¢â‚¬Å¡ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢ÃƒÂ§Ã‚Â¾Ã‚Â¤"
+	chatBody := "æš‚æ— é»‘åå•ç¾¤"
 	if len(chats) > 0 {
 		parts := make([]string, 0, len(chats))
 		for _, chat := range chats {
@@ -1251,7 +1251,7 @@ func (s *AdminService) blacklistText() string {
 		chatBody = strings.Join(parts, "\n")
 	}
 
-	return fmt.Sprintf("ÃƒÂ°Ã…Â¸Ã…Â¡Ã‚Â« ÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢\n\nÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â· %d ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ¯Ã‚Â¼Ã…Â¡\n%s\n\nÃƒÂ§Ã‚Â¾Ã‚Â¤ %d ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ¯Ã‚Â¼Ã…Â¡\n%s", len(users), userBody, len(chats), chatBody)
+	return fmt.Sprintf("ðŸš« é»‘åå•\n\nç”¨æˆ· %d ä¸ªï¼š\n%s\n\nç¾¤ %d ä¸ªï¼š\n%s", len(users), userBody, len(chats), chatBody)
 }
 
 func (s *AdminService) statusText() string {
@@ -1262,8 +1262,7 @@ func (s *AdminService) statusText() string {
 	matchRecords := s.recordStore.MatchRecords()
 	todaySent, todaySuccess, todayFailed := s.dmStatsToday()
 	return fmt.Sprintf(
-		"ðŸ“Š è¿è¡ŒçŠ¶æ€\n\nç‰ˆæœ¬: %s\nç›‘æŽ§è´¦å·: %dåœ¨çº¿ / %dç¦»çº¿\nå…³é”®è¯: %dä¸ª\nå‘½ä¸­è®°å½•: %d\nç§ä¿¡è®°å½•: å‘é€ %d | æˆåŠŸ %d | å¤±è´¥ %d\nè¿‡æ»¤å¼€å…³: %s\nå‘é€æ¨¡å¼: %s",
-		version.Current,
+		"ðŸ“Š è¿è¡ŒçŠ¶æ€\n\nç›‘æŽ§è´¦å·: %dåœ¨çº¿ / %dç¦»çº¿\nå…³é”®è¯: %dä¸ª\nå‘½ä¸­è®°å½•: %d\nç§ä¿¡è®°å½•: å‘é€ %d | æˆåŠŸ %d | å¤±è´¥ %d\nè¿‡æ»¤å¼€å…³: %s\nå‘é€æ¨¡å¼: %s",
 		active,
 		total-active,
 		len(s.keywordStore.List()),
@@ -1280,16 +1279,16 @@ func (s *AdminService) mainKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â± ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¦Ã…Â½Ã‚Â§ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·", CallbackData: callbackAccounts},
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ§Ã‚Â®Ã‚Â¡ÃƒÂ§Ã‚ÂÃ¢â‚¬Â ", CallbackData: callbackKeywords},
+				{Text: "ðŸ“± ç›‘æŽ§è´¦å·", CallbackData: callbackAccounts},
+				{Text: "ðŸ“ å…³é”®è¯ç®¡ç†", CallbackData: callbackKeywords},
 			},
 			{
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬â„¢Ã‚Â¬ ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¦Ã‚Â±Ã‚Â ", CallbackData: callbackDMPool},
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¤ ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ¦Ã‚ÂÃ‚Â®ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚Âº", CallbackData: callbackExport},
+				{Text: "ðŸ’¬ ç§ä¿¡å·æ± ", CallbackData: callbackDMPool},
+				{Text: "ðŸ“¤ æ•°æ®å¯¼å‡º", CallbackData: callbackExport},
 			},
 			{
-				{Text: "ÃƒÂ¢Ã…Â¡Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¸Ã‚Â ÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤ÃƒÂ¨Ã‚Â®Ã‚Â¾ÃƒÂ§Ã‚Â½Ã‚Â®", CallbackData: callbackFilters},
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã…Â  ÃƒÂ¨Ã‚Â¿Ã‚ÂÃƒÂ¨Ã‚Â¡Ã…â€™ÃƒÂ§Ã…Â Ã‚Â¶ÃƒÂ¦Ã¢â€šÂ¬Ã‚Â", CallbackData: callbackStatus},
+				{Text: "âš™ï¸ è¿‡æ»¤è®¾ç½®", CallbackData: callbackFilters},
+				{Text: "ðŸ“Š è¿è¡ŒçŠ¶æ€", CallbackData: callbackStatus},
 			},
 		},
 	}
@@ -1299,11 +1298,11 @@ func (s *AdminService) accountsMenuKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{
-				{Text: "ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â¢ ÃƒÂ¦Ã‚Â·Ã‚Â»ÃƒÂ¥Ã…Â Ã‚Â ÃƒÂ¦Ã¢â‚¬â€œÃ‚Â°ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·", CallbackData: callbackAccountAdd},
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‹â€ Ã¢â‚¬â€ÃƒÂ¨Ã‚Â¡Ã‚Â¨", CallbackData: callbackAccountList},
+				{Text: "âž• æ·»åŠ æ–°è´¦å·", CallbackData: callbackAccountAdd},
+				{Text: "ðŸ“‹ è´¦å·åˆ—è¡¨", CallbackData: callbackAccountList},
 			},
 			{
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾ÃƒÂ¤Ã‚Â¸Ã‚Â»ÃƒÂ¨Ã‚ÂÃ…â€œÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢", CallbackData: callbackMain},
+				{Text: "ðŸ”™ è¿”å›žä¸»èœå•", CallbackData: callbackMain},
 			},
 		},
 	}
@@ -1313,16 +1312,16 @@ func (s *AdminService) accountsListKeyboard() *model.InlineKeyboardMarkup {
 	accounts := s.listMonitorAccounts()
 	rows := make([][]model.InlineKeyboardButton, 0, len(accounts)+1)
 	for _, account := range accounts {
-		status := "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â´"
+		status := "ðŸ”´"
 		if account.Online {
-			status = "ÃƒÂ°Ã…Â¸Ã…Â¸Ã‚Â¢"
+			status = "ðŸŸ¢"
 		}
 		rows = append(rows, []model.InlineKeyboardButton{
 			{Text: status + " " + account.Phone, CallbackData: callbackAccountDetailPrefix + account.Phone},
 		})
 	}
 	rows = append(rows, []model.InlineKeyboardButton{
-		{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾", CallbackData: callbackAccounts},
+		{Text: "ðŸ”™ è¿”å›ž", CallbackData: callbackAccounts},
 	})
 	return &model.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
@@ -1330,7 +1329,7 @@ func (s *AdminService) accountsListKeyboard() *model.InlineKeyboardMarkup {
 func (s *AdminService) backToAccountsKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾", CallbackData: callbackAccounts}},
+			{{Text: "ðŸ”™ è¿”å›ž", CallbackData: callbackAccounts}},
 		},
 	}
 }
@@ -1339,14 +1338,14 @@ func (s *AdminService) keywordsKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{
-				{Text: "ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â¢ ÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ§Ã‚Â³Ã…Â ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚Â", CallbackData: callbackKeywordAdd},
-				{Text: "ÃƒÂ°Ã…Â¸Ã…Â½Ã‚Â¯ ÃƒÂ§Ã‚Â²Ã‚Â¾ÃƒÂ¥Ã¢â‚¬Â¡Ã¢â‚¬Â ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚Â", CallbackData: callbackKeywordAdd + ":exact"},
+				{Text: "âž• æ¨¡ç³Šå…³é”®è¯", CallbackData: callbackKeywordAdd},
+				{Text: "ðŸŽ¯ ç²¾å‡†å…³é”®è¯", CallbackData: callbackKeywordAdd + ":exact"},
 			},
 			{
-				{Text: "ÃƒÂ¢Ã…Â¾Ã¢â‚¬â€œ ÃƒÂ¥Ã‹â€ Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚Â", CallbackData: callbackKeywordRemove},
+				{Text: "âž– åˆ é™¤å…³é”®è¯", CallbackData: callbackKeywordRemove},
 			},
 			{
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾ÃƒÂ¤Ã‚Â¸Ã‚Â»ÃƒÂ¨Ã‚ÂÃ…â€œÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢", CallbackData: callbackMain},
+				{Text: "ðŸ”™ è¿”å›žä¸»èœå•", CallbackData: callbackMain},
 			},
 		},
 	}
@@ -1356,22 +1355,22 @@ func (s *AdminService) dmPoolKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ…â€™ ÃƒÂ¨Ã‚Â¿Ã…Â¾ÃƒÂ¦Ã…Â½Ã‚Â¥ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·", CallbackData: callbackDMConnect},
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¤ ÃƒÂ¤Ã‚Â¸Ã…Â ÃƒÂ¤Ã‚Â¼Ã‚Â  Session", CallbackData: callbackDMUpload},
+				{Text: "ðŸ”Œ è¿žæŽ¥ç§ä¿¡å·", CallbackData: callbackDMConnect},
+				{Text: "ðŸ“¤ ä¸Šä¼  Session", CallbackData: callbackDMUpload},
 			},
 			{
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‹â€ Ã¢â‚¬â€ÃƒÂ¨Ã‚Â¡Ã‚Â¨", CallbackData: callbackDMList},
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â ÃƒÂ¤Ã‚Â¸Ã¢â€šÂ¬ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¦Ã‚Â£Ã¢â€šÂ¬ÃƒÂ¦Ã…Â¸Ã‚Â¥ÃƒÂ§Ã…Â Ã‚Â¶ÃƒÂ¦Ã¢â€šÂ¬Ã‚Â", CallbackData: callbackDMCheckAll},
+				{Text: "ðŸ“‹ è´¦å·åˆ—è¡¨", CallbackData: callbackDMList},
+				{Text: "ðŸ” ä¸€é”®æ£€æŸ¥çŠ¶æ€", CallbackData: callbackDMCheckAll},
 			},
 			{
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¦Ã…â€œÃ‚Â¯ÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ¦Ã‚ÂÃ‚Â¿", CallbackData: callbackDMTemplates},
-				{Text: "ÃƒÂ¢Ã…Â¡Ã¢â€žÂ¢ÃƒÂ¯Ã‚Â¸Ã‚Â ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¨Ã‚Â®Ã‚Â¾ÃƒÂ§Ã‚Â½Ã‚Â®", CallbackData: callbackDMSettings},
+				{Text: "ðŸ“ è¯æœ¯æ¨¡æ¿", CallbackData: callbackDMTemplates},
+				{Text: "âš™ï¸ å‘é€è®¾ç½®", CallbackData: callbackDMSettings},
 			},
 			{
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¨ ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚ÂÃƒÂ¨Ã‚Â®Ã‚Â°ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢", CallbackData: callbackDMRecords},
+				{Text: "ðŸ“¨ å‘é€è®°å½•", CallbackData: callbackDMRecords},
 			},
 			{
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾ÃƒÂ¤Ã‚Â¸Ã‚Â»ÃƒÂ¨Ã‚ÂÃ…â€œÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢", CallbackData: callbackMain},
+				{Text: "ðŸ”™ è¿”å›žä¸»èœå•", CallbackData: callbackMain},
 			},
 		},
 	}
@@ -1381,9 +1380,9 @@ func (s *AdminService) dmAccountsKeyboard() *model.InlineKeyboardMarkup {
 	accounts := s.listDMAccounts()
 	rows := make([][]model.InlineKeyboardButton, 0, len(accounts)+2)
 	for _, account := range accounts {
-		status := "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â´"
+		status := "ðŸ”´"
 		if account.Online {
-			status = "ÃƒÂ°Ã…Â¸Ã…Â¸Ã‚Â¢"
+			status = "ðŸŸ¢"
 		}
 		rows = append(rows, []model.InlineKeyboardButton{
 			{Text: status + " " + account.Phone, CallbackData: callbackDMDetailPrefix + account.Phone},
@@ -1391,11 +1390,11 @@ func (s *AdminService) dmAccountsKeyboard() *model.InlineKeyboardMarkup {
 	}
 	rows = append(rows,
 		[]model.InlineKeyboardButton{
-			{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ…â€™ ÃƒÂ¨Ã‚Â¿Ã…Â¾ÃƒÂ¦Ã…Â½Ã‚Â¥ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·", CallbackData: callbackDMConnect},
-			{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¤ ÃƒÂ¤Ã‚Â¸Ã…Â ÃƒÂ¤Ã‚Â¼Ã‚Â  Session", CallbackData: callbackDMUpload},
+			{Text: "ðŸ”Œ è¿žæŽ¥ç§ä¿¡å·", CallbackData: callbackDMConnect},
+			{Text: "ðŸ“¤ ä¸Šä¼  Session", CallbackData: callbackDMUpload},
 		},
-		[]model.InlineKeyboardButton{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â ÃƒÂ¤Ã‚Â¸Ã¢â€šÂ¬ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¦Ã‚Â£Ã¢â€šÂ¬ÃƒÂ¦Ã…Â¸Ã‚Â¥ÃƒÂ§Ã…Â Ã‚Â¶ÃƒÂ¦Ã¢â€šÂ¬Ã‚Â", CallbackData: callbackDMCheckAll}},
-		[]model.InlineKeyboardButton{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾", CallbackData: callbackDMPool}},
+		[]model.InlineKeyboardButton{{Text: "ðŸ” ä¸€é”®æ£€æŸ¥çŠ¶æ€", CallbackData: callbackDMCheckAll}},
+		[]model.InlineKeyboardButton{{Text: "ðŸ”™ è¿”å›ž", CallbackData: callbackDMPool}},
 	)
 	return &model.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
@@ -1404,11 +1403,11 @@ func (s *AdminService) dmTemplatesKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{
-				{Text: "Ã¢Å¾â€¢ Ã¦Â·Â»Ã¥Å Â Ã¨Â¯ÂÃ¦Å“Â¯", CallbackData: callbackDMTemplateAdd},
-				{Text: "Ã¢Å¾â€“ Ã¥Ë†Â Ã©â„¢Â¤Ã¨Â¯ÂÃ¦Å“Â¯", CallbackData: callbackDMTemplateRemove},
+				{Text: "➕ 添加话术", CallbackData: callbackDMTemplateAdd},
+				{Text: "➖ 删除话术", CallbackData: callbackDMTemplateRemove},
 			},
 			{
-				{Text: "Ã°Å¸â€â„¢ Ã¨Â¿â€Ã¥â€ºÅ¾", CallbackData: callbackDMPool},
+				{Text: "🔙 返回", CallbackData: callbackDMPool},
 			},
 		},
 	}
@@ -1418,18 +1417,18 @@ func (s *AdminService) dmTemplateModeKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{
-				{Text: "Ã°Å¸â€œÂ Ã¦â€“â€¡Ã¦Å“Â¬Ã§â€ºÂ´Ã¥Ââ€˜", CallbackData: callbackDMTemplateAddText},
-				{Text: "Ã°Å¸Â¤â€“ Ã¥â€ â€¦Ã¨Ââ€Bot", CallbackData: callbackDMTemplateAddPost},
+				{Text: "📝 文本直发", CallbackData: callbackDMTemplateAddText},
+				{Text: "🤖 内联Bot", CallbackData: callbackDMTemplateAddPost},
 			},
 			{
-				{Text: "Ã°Å¸â€œÂ¢ Ã©Â¢â€˜Ã©Ââ€œÃ¨Â½Â¬Ã¥Ââ€˜", CallbackData: callbackDMTemplateAddFwd},
-				{Text: "Ã°Å¸â€¢Â¶ Ã©Å¡ÂÃ¨â€”ÂÃ¦ÂÂ¥Ã¦ÂºÂÃ¨Â½Â¬Ã¥Ââ€˜", CallbackData: callbackDMTemplateAddHide},
+				{Text: "📢 频道转发", CallbackData: callbackDMTemplateAddFwd},
+				{Text: "🕶 隐藏来源转发", CallbackData: callbackDMTemplateAddHide},
 			},
 			{
-				{Text: "Ã°Å¸ÂÂ¢ Ã¤Â¼ÂÃ¤Â¸Å¡Ã¥Â¿Â«Ã¦ÂÂ·Ã¥â€ºÅ¾Ã¥Â¤Â", CallbackData: callbackDMTemplateAddQuick},
+				{Text: "🏢 企业快捷回复", CallbackData: callbackDMTemplateAddQuick},
 			},
 			{
-				{Text: "Ã°Å¸â€â„¢ Ã¨Â¿â€Ã¥â€ºÅ¾Ã¨Â¯ÂÃ¦Å“Â¯Ã¥Ë†â€”Ã¨Â¡Â¨", CallbackData: callbackDMTemplates},
+				{Text: "🔙 返回话术列表", CallbackData: callbackDMTemplates},
 			},
 		},
 	}
@@ -1439,10 +1438,10 @@ func (s *AdminService) dmRecordsKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¤ ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¥Ã‚Â¼Ã¢â‚¬Å¡ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ¥Ã‚ÂÃ‚Â·", CallbackData: callbackDMExportFailed},
+				{Text: "ðŸ“¤ å¯¼å‡ºå¼‚å¸¸å·", CallbackData: callbackDMExportFailed},
 			},
 			{
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾", CallbackData: callbackDMPool},
+				{Text: "ðŸ”™ è¿”å›ž", CallbackData: callbackDMPool},
 			},
 		},
 	}
@@ -1452,11 +1451,11 @@ func (s *AdminService) dmSettingsKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{
-				{Text: "ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â¡ÃƒÂ¦Ã‚ÂÃ‚Â¢ Dry-run", CallbackData: callbackToggleDryRun},
-				{Text: "ÃƒÂ¨Ã‚Â®Ã‚Â¾ÃƒÂ§Ã‚Â½Ã‚Â®ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´", CallbackData: callbackSetCooldown},
+				{Text: "åˆ‡æ¢ Dry-run", CallbackData: callbackToggleDryRun},
+				{Text: "è®¾ç½®å†·å´", CallbackData: callbackSetCooldown},
 			},
 			{
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾", CallbackData: callbackDMPool},
+				{Text: "ðŸ”™ è¿”å›ž", CallbackData: callbackDMPool},
 			},
 		},
 	}
@@ -1465,10 +1464,10 @@ func (s *AdminService) dmSettingsKeyboard() *model.InlineKeyboardMarkup {
 func (s *AdminService) exportKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¦ ÃƒÂ¦Ã…â€™Ã¢â‚¬Â°ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¶ÃƒÂ©Ã¢â‚¬â€Ã‚Â´ÃƒÂ¦Ã‚Â®Ã‚ÂµÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚Âº", CallbackData: callbackExportByTime}},
-			{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â‚¬Ëœ ÃƒÂ¦Ã…â€™Ã¢â‚¬Â°ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚ÂÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚Âº", CallbackData: callbackExportByKeyword}},
-			{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â¨ÃƒÂ©Ã†â€™Ã‚Â¨ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ¦Ã‚ÂÃ‚Â®", CallbackData: callbackExportAll}},
-			{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾ÃƒÂ¤Ã‚Â¸Ã‚Â»ÃƒÂ¨Ã‚ÂÃ…â€œÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢", CallbackData: callbackMain}},
+			{{Text: "ðŸ“… æŒ‰æ—¶é—´æ®µå¯¼å‡º", CallbackData: callbackExportByTime}},
+			{{Text: "ðŸ”‘ æŒ‰å…³é”®è¯å¯¼å‡º", CallbackData: callbackExportByKeyword}},
+			{{Text: "ðŸ“‹ å¯¼å‡ºå…¨éƒ¨æ•°æ®", CallbackData: callbackExportAll}},
+			{{Text: "ðŸ”™ è¿”å›žä¸»èœå•", CallbackData: callbackMain}},
 		},
 	}
 }
@@ -1476,10 +1475,10 @@ func (s *AdminService) exportKeyboard() *model.InlineKeyboardMarkup {
 func (s *AdminService) exportFormatKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‚Â¤ ÃƒÂ¤Ã‚Â»Ã¢â‚¬Â¦ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â (TXT)", CallbackData: callbackExportFormatUsers}},
-			{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Â Ã¢â‚¬Â ÃƒÂ¤Ã‚Â»Ã¢â‚¬Â¦ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ID (TXT)", CallbackData: callbackExportFormatIDs}},
-			{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã…Â  ÃƒÂ¥Ã‚Â®Ã…â€™ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â´ÃƒÂ¨Ã‚Â®Ã‚Â°ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢ (CSV)", CallbackData: callbackExportFormatCSV}},
-			{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾", CallbackData: callbackExport}},
+			{{Text: "ðŸ‘¤ ä»…ç”¨æˆ·å (TXT)", CallbackData: callbackExportFormatUsers}},
+			{{Text: "ðŸ†” ä»…ç”¨æˆ·ID (TXT)", CallbackData: callbackExportFormatIDs}},
+			{{Text: "ðŸ“Š å®Œæ•´è®°å½• (CSV)", CallbackData: callbackExportFormatCSV}},
+			{{Text: "ðŸ”™ è¿”å›ž", CallbackData: callbackExport}},
 		},
 	}
 }
@@ -1487,7 +1486,7 @@ func (s *AdminService) exportFormatKeyboard() *model.InlineKeyboardMarkup {
 func (s *AdminService) cancelExportKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¥Ã‚ÂÃ¢â‚¬â€œÃƒÂ¦Ã‚Â¶Ã‹â€ ", CallbackData: callbackExport}},
+			{{Text: "ðŸ”™ å–æ¶ˆ", CallbackData: callbackExport}},
 		},
 	}
 }
@@ -1495,13 +1494,13 @@ func (s *AdminService) cancelExportKeyboard() *model.InlineKeyboardMarkup {
 func (s *AdminService) legacyRulesKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "ÃƒÂ¥Ã‚Â¼Ã¢â€šÂ¬ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¦Ã…Â½Ã‚Â§", CallbackData: callbackToggleMonitor}, {Text: "ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â¡ÃƒÂ¦Ã‚ÂÃ‚Â¢ Dry-run", CallbackData: callbackToggleDryRun}},
-			{{Text: "ÃƒÂ¨Ã‚Â®Ã‚Â¾ÃƒÂ§Ã‚Â½Ã‚Â®ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´", CallbackData: callbackSetCooldown}, {Text: "ÃƒÂ¨Ã‚Â®Ã‚Â¾ÃƒÂ§Ã‚Â½Ã‚Â®ÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ¦Ã‚ÂÃ‚Â¿", CallbackData: callbackSetTemplate}},
-			{{Text: "ÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â¤Ã‚Â§ÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã¢â‚¬Â¢Ã‚Â¿ÃƒÂ¥Ã‚ÂºÃ‚Â¦", CallbackData: callbackSetMaxLength}, {Text: "ÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‚Â¹Ã‚Â´ÃƒÂ©Ã‚Â¾Ã¢â‚¬Å¾", CallbackData: callbackSetMinAge}},
-			{{Text: "ÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â", CallbackData: callbackToggleNoName}, {Text: "ÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ¥Ã‚Â¤Ã‚Â´ÃƒÂ¥Ã†â€™Ã‚Â", CallbackData: callbackToggleNoPhoto}},
-			{{Text: "ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚Â¬ÃƒÂ§Ã‚Â¾Ã‚Â¤ÃƒÂ©Ã¢â‚¬Â¦Ã‚ÂÃƒÂ§Ã‚Â½Ã‚Â®", CallbackData: callbackChats}, {Text: "ÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢", CallbackData: callbackBlacklist}},
-			{{Text: "ÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ¨Ã‚ÂÃ…Â ÃƒÂ¥Ã‚Â¤Ã‚Â©ÃƒÂ¨Ã‚Â®Ã‚Â¾ÃƒÂ¤Ã‚Â¸Ã‚ÂºÃƒÂ©Ã¢â€šÂ¬Ã…Â¡ÃƒÂ§Ã…Â¸Ã‚Â¥ÃƒÂ§Ã‚Â¾Ã‚Â¤", CallbackData: callbackSetAlertChat}},
-			{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾ÃƒÂ¤Ã‚Â¸Ã‚Â»ÃƒÂ¨Ã‚ÂÃ…â€œÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢", CallbackData: callbackMain}},
+			{{Text: "å¼€å…³ç›‘æŽ§", CallbackData: callbackToggleMonitor}, {Text: "åˆ‡æ¢ Dry-run", CallbackData: callbackToggleDryRun}},
+			{{Text: "è®¾ç½®å†·å´", CallbackData: callbackSetCooldown}, {Text: "è®¾ç½®æ¨¡æ¿", CallbackData: callbackSetTemplate}},
+			{{Text: "æœ€å¤§æ¶ˆæ¯é•¿åº¦", CallbackData: callbackSetMaxLength}, {Text: "æœ€å°è´¦å·å¹´é¾„", CallbackData: callbackSetMinAge}},
+			{{Text: "è¿‡æ»¤æ— ç”¨æˆ·å", CallbackData: callbackToggleNoName}, {Text: "è¿‡æ»¤æ— å¤´åƒ", CallbackData: callbackToggleNoPhoto}},
+			{{Text: "ç›‘å¬ç¾¤é…ç½®", CallbackData: callbackChats}, {Text: "é»‘åå•", CallbackData: callbackBlacklist}},
+			{{Text: "å½“å‰èŠå¤©è®¾ä¸ºé€šçŸ¥ç¾¤", CallbackData: callbackSetAlertChat}},
+			{{Text: "ðŸ”™ è¿”å›žä¸»èœå•", CallbackData: callbackMain}},
 		},
 	}
 }
@@ -1509,15 +1508,15 @@ func (s *AdminService) legacyRulesKeyboard() *model.InlineKeyboardMarkup {
 func (s *AdminService) rulesKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "ÃƒÂ¥Ã‚Â¼Ã¢â€šÂ¬ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¦Ã…Â½Ã‚Â§", CallbackData: callbackToggleMonitor}, {Text: "ÃƒÂ¥Ã‹â€ Ã¢â‚¬Â¡ÃƒÂ¦Ã‚ÂÃ‚Â¢ Dry-run", CallbackData: callbackToggleDryRun}},
-			{{Text: "ÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´", CallbackData: callbackSetCooldown}, {Text: "ÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ§Ã‚Â¾Ã‚Â¤ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´", CallbackData: callbackSetChatCooldown}},
-			{{Text: "ÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ¥Ã¢â‚¬Â Ã¢â‚¬Â¦ÃƒÂ¥Ã‚Â®Ã‚Â¹ÃƒÂ¥Ã¢â‚¬Â Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â´", CallbackData: callbackSetTextCooldown}, {Text: "ÃƒÂ¨Ã‚Â®Ã‚Â¾ÃƒÂ§Ã‚Â½Ã‚Â®ÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ¦Ã‚ÂÃ‚Â¿", CallbackData: callbackSetTemplate}},
-			{{Text: "ÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã¢â‚¬Â¢Ã‚Â¿ÃƒÂ¥Ã‚ÂºÃ‚Â¦", CallbackData: callbackSetMinLength}, {Text: "ÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â¤Ã‚Â§ÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã¢â‚¬Â¢Ã‚Â¿ÃƒÂ¥Ã‚ÂºÃ‚Â¦", CallbackData: callbackSetMaxLength}},
-			{{Text: "ÃƒÂ¦Ã…â€œÃ¢â€šÂ¬ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‚Â¹Ã‚Â´ÃƒÂ©Ã‚Â¾Ã¢â‚¬Å¾", CallbackData: callbackSetMinAge}, {Text: "ÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â", CallbackData: callbackToggleNoName}},
-			{{Text: "ÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ¦Ã‚Â»Ã‚Â¤ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ¥Ã‚Â¤Ã‚Â´ÃƒÂ¥Ã†â€™Ã‚Â", CallbackData: callbackToggleNoPhoto}},
-			{{Text: "ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚Â¬ÃƒÂ§Ã‚Â¾Ã‚Â¤ÃƒÂ©Ã¢â‚¬Â¦Ã‚ÂÃƒÂ§Ã‚Â½Ã‚Â®", CallbackData: callbackChats}, {Text: "ÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢", CallbackData: callbackBlacklist}},
-			{{Text: "ÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ¨Ã‚ÂÃ…Â ÃƒÂ¥Ã‚Â¤Ã‚Â©ÃƒÂ¨Ã‚Â®Ã‚Â¾ÃƒÂ¤Ã‚Â¸Ã‚ÂºÃƒÂ©Ã¢â€šÂ¬Ã…Â¡ÃƒÂ§Ã…Â¸Ã‚Â¥ÃƒÂ§Ã‚Â¾Ã‚Â¤", CallbackData: callbackSetAlertChat}},
-			{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾ÃƒÂ¤Ã‚Â¸Ã‚Â»ÃƒÂ¨Ã‚ÂÃ…â€œÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢", CallbackData: callbackMain}},
+			{{Text: "å¼€å…³ç›‘æŽ§", CallbackData: callbackToggleMonitor}, {Text: "åˆ‡æ¢ Dry-run", CallbackData: callbackToggleDryRun}},
+			{{Text: "åŒç”¨æˆ·å†·å´", CallbackData: callbackSetCooldown}, {Text: "åŒç¾¤å†·å´", CallbackData: callbackSetChatCooldown}},
+			{{Text: "åŒå†…å®¹å†·å´", CallbackData: callbackSetTextCooldown}, {Text: "è®¾ç½®æ¨¡æ¿", CallbackData: callbackSetTemplate}},
+			{{Text: "æœ€å°æ¶ˆæ¯é•¿åº¦", CallbackData: callbackSetMinLength}, {Text: "æœ€å¤§æ¶ˆæ¯é•¿åº¦", CallbackData: callbackSetMaxLength}},
+			{{Text: "æœ€å°è´¦å·å¹´é¾„", CallbackData: callbackSetMinAge}, {Text: "è¿‡æ»¤æ— ç”¨æˆ·å", CallbackData: callbackToggleNoName}},
+			{{Text: "è¿‡æ»¤æ— å¤´åƒ", CallbackData: callbackToggleNoPhoto}},
+			{{Text: "ç›‘å¬ç¾¤é…ç½®", CallbackData: callbackChats}, {Text: "é»‘åå•", CallbackData: callbackBlacklist}},
+			{{Text: "å½“å‰èŠå¤©è®¾ä¸ºé€šçŸ¥ç¾¤", CallbackData: callbackSetAlertChat}},
+			{{Text: "ðŸ”™ è¿”å›žä¸»èœå•", CallbackData: callbackMain}},
 		},
 	}
 }
@@ -1525,8 +1524,8 @@ func (s *AdminService) rulesKeyboard() *model.InlineKeyboardMarkup {
 func (s *AdminService) chatsKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "ÃƒÂ¢Ã…Â¾Ã¢â‚¬Â¢ ÃƒÂ¦Ã‚Â·Ã‚Â»ÃƒÂ¥Ã…Â Ã‚Â ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚Â¬ÃƒÂ§Ã‚Â¾Ã‚Â¤", CallbackData: callbackAddChat}, {Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬â€Ã¢â‚¬Ëœ ÃƒÂ§Ã‚Â§Ã‚Â»ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚Â¬ÃƒÂ§Ã‚Â¾Ã‚Â¤", CallbackData: callbackRemoveChat}},
-			{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾", CallbackData: callbackFilters}},
+			{{Text: "âž• æ·»åŠ ç›‘å¬ç¾¤", CallbackData: callbackAddChat}, {Text: "ðŸ—‘ ç§»é™¤ç›‘å¬ç¾¤", CallbackData: callbackRemoveChat}},
+			{{Text: "ðŸ”™ è¿”å›ž", CallbackData: callbackFilters}},
 		},
 	}
 }
@@ -1534,8 +1533,8 @@ func (s *AdminService) chatsKeyboard() *model.InlineKeyboardMarkup {
 func (s *AdminService) blacklistKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "ÃƒÂ§Ã‚Â§Ã‚Â»ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·", CallbackData: callbackUnblockUser}, {Text: "ÃƒÂ§Ã‚Â§Ã‚Â»ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢ÃƒÂ§Ã‚Â¾Ã‚Â¤", CallbackData: callbackUnblockChat}},
-			{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾", CallbackData: callbackFilters}},
+			{{Text: "ç§»å‡ºé»‘åå•ç”¨æˆ·", CallbackData: callbackUnblockUser}, {Text: "ç§»å‡ºé»‘åå•ç¾¤", CallbackData: callbackUnblockChat}},
+			{{Text: "ðŸ”™ è¿”å›ž", CallbackData: callbackFilters}},
 		},
 	}
 }
@@ -1543,14 +1542,14 @@ func (s *AdminService) blacklistKeyboard() *model.InlineKeyboardMarkup {
 func (s *AdminService) statusKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾ÃƒÂ¤Ã‚Â¸Ã‚Â»ÃƒÂ¨Ã‚ÂÃ…â€œÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢", CallbackData: callbackMain}},
+			{{Text: "ðŸ”™ è¿”å›žä¸»èœå•", CallbackData: callbackMain}},
 		},
 	}
 }
 
 func (s *AdminService) blockUserCallback(data string) (string, error) {
 	if s.blacklist == nil {
-		return "ÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢ÃƒÂ¦Ã…â€œÃ‚ÂªÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨", nil
+		return "é»‘åå•æœªå¯ç”¨", nil
 	}
 	payload := strings.TrimPrefix(data, callbackBlockUser)
 	parts := strings.SplitN(payload, ":", 2)
@@ -1567,14 +1566,14 @@ func (s *AdminService) blockUserCallback(data string) (string, error) {
 		return "", err
 	}
 	if !added {
-		return "ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã…â€œÃ‚Â¨ÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢", nil
+		return "ç”¨æˆ·å·²åœ¨é»‘åå•", nil
 	}
-	return "ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã¢â‚¬Â¹Ã¢â‚¬Â°ÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·", nil
+	return "å·²æ‹‰é»‘ç”¨æˆ·", nil
 }
 
 func (s *AdminService) blockChatCallback(data string) (string, error) {
 	if s.blacklist == nil {
-		return "ÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢ÃƒÂ¦Ã…â€œÃ‚ÂªÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨", nil
+		return "é»‘åå•æœªå¯ç”¨", nil
 	}
 	chatID, err := strconv.ParseInt(strings.TrimPrefix(data, callbackBlockChat), 10, 64)
 	if err != nil {
@@ -1585,9 +1584,9 @@ func (s *AdminService) blockChatCallback(data string) (string, error) {
 		return "", err
 	}
 	if !added {
-		return "ÃƒÂ§Ã‚Â¾Ã‚Â¤ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã…â€œÃ‚Â¨ÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ¥Ã‚ÂÃ‚ÂÃƒÂ¥Ã‚ÂÃ¢â‚¬Â¢", nil
+		return "ç¾¤å·²åœ¨é»‘åå•", nil
 	}
-	return "ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã¢â‚¬Â¹Ã¢â‚¬Â°ÃƒÂ©Ã‚Â»Ã¢â‚¬ËœÃƒÂ§Ã‚Â¾Ã‚Â¤", nil
+	return "å·²æ‹‰é»‘ç¾¤", nil
 }
 
 func (s *AdminService) removeBlockedUsers(ids []int64) (int, error) {
@@ -1627,12 +1626,12 @@ func (s *AdminService) removeBlockedChats(ids []int64) (int, error) {
 func (s *AdminService) sendExportFile(ctx context.Context, chatID, userID int64, format string) error {
 	exportCtx, ok := s.getExportContext(userID)
 	if !ok {
-		return fmt.Errorf("ÃƒÂ¨Ã‚Â¯Ã‚Â·ÃƒÂ¥Ã¢â‚¬Â¦Ã‹â€ ÃƒÂ©Ã¢â€šÂ¬Ã¢â‚¬Â°ÃƒÂ¦Ã¢â‚¬Â¹Ã‚Â©ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¦Ã‚ÂÃ‚Â¡ÃƒÂ¤Ã‚Â»Ã‚Â¶")
+		return fmt.Errorf("è¯·å…ˆé€‰æ‹©å¯¼å‡ºæ¡ä»¶")
 	}
 
 	records := s.filterMatchRecords(exportCtx)
 	if len(records) == 0 {
-		return fmt.Errorf("ÃƒÂ¦Ã‚Â²Ã‚Â¡ÃƒÂ¦Ã…â€œÃ¢â‚¬Â°ÃƒÂ¥Ã…â€™Ã‚Â¹ÃƒÂ©Ã¢â‚¬Â¦Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â°ÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ¦Ã¢â‚¬Â¢Ã‚Â°ÃƒÂ¦Ã‚ÂÃ‚Â®")
+		return fmt.Errorf("æ²¡æœ‰åŒ¹é…åˆ°å¯å¯¼å‡ºçš„æ•°æ®")
 	}
 
 	var (
@@ -1652,17 +1651,17 @@ func (s *AdminService) sendExportFile(ctx context.Context, chatID, userID int64,
 		filename = fmt.Sprintf("jtbot_records_%s.csv", time.Now().Format("20060102_150405"))
 		data, err = buildCSV(records)
 	default:
-		return fmt.Errorf("ÃƒÂ¦Ã…â€œÃ‚ÂªÃƒÂ§Ã…Â¸Ã‚Â¥ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¦Ã‚Â Ã‚Â¼ÃƒÂ¥Ã‚Â¼Ã‚Â")
+		return fmt.Errorf("æœªçŸ¥å¯¼å‡ºæ ¼å¼")
 	}
 	if err != nil {
 		return err
 	}
 
 	if len(data) == 0 {
-		return fmt.Errorf("ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ§Ã‚Â»Ã¢â‚¬Å“ÃƒÂ¦Ã…Â¾Ã…â€œÃƒÂ¤Ã‚Â¸Ã‚ÂºÃƒÂ§Ã‚Â©Ã‚Âº")
+		return fmt.Errorf("å¯¼å‡ºç»“æžœä¸ºç©º")
 	}
 
-	caption := fmt.Sprintf("ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¥Ã‚Â®Ã…â€™ÃƒÂ¦Ã‹â€ Ã‚ÂÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â± %d ÃƒÂ¦Ã‚ÂÃ‚Â¡ÃƒÂ¨Ã‚Â®Ã‚Â°ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", len(records))
+	caption := fmt.Sprintf("å¯¼å‡ºå®Œæˆï¼Œå…± %d æ¡è®°å½•ã€‚", len(records))
 	if err := s.client.SendDocument(ctx, chatID, filename, data, caption); err != nil {
 		return err
 	}
@@ -1697,7 +1696,7 @@ func (s *AdminService) filterMatchRecords(exportCtx exportContext) []model.Match
 func buildCSV(records []model.MatchRecord) ([]byte, error) {
 	var buf bytes.Buffer
 	writer := csv.NewWriter(&buf)
-	if err := writer.Write([]string{"ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ID", "ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ¦Ã‹â€ Ã‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â", "ÃƒÂ¦Ã‹Å“Ã‚ÂµÃƒÂ§Ã‚Â§Ã‚Â°", "ÃƒÂ¦Ã‚ÂÃ‚Â¥ÃƒÂ¦Ã‚ÂºÃ‚ÂÃƒÂ§Ã‚Â¾Ã‚Â¤ÃƒÂ§Ã‚Â»Ã¢â‚¬Å¾", "ÃƒÂ¨Ã‚Â§Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬ÂÃ‚Â®ÃƒÂ¨Ã‚Â¯Ã‚Â", "ÃƒÂ¨Ã‚Â§Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ¦Ã¢â‚¬â€Ã‚Â¶ÃƒÂ©Ã¢â‚¬â€Ã‚Â´", "ÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ¥Ã¢â‚¬Â Ã¢â‚¬Â¦ÃƒÂ¥Ã‚Â®Ã‚Â¹", "ÃƒÂ§Ã¢â‚¬ÂºÃ¢â‚¬ËœÃƒÂ¦Ã…Â½Ã‚Â§ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·"}); err != nil {
+	if err := writer.Write([]string{"ç”¨æˆ·ID", "ç”¨æˆ·å", "æ˜µç§°", "æ¥æºç¾¤ç»„", "è§¦å‘å…³é”®è¯", "è§¦å‘æ—¶é—´", "æ¶ˆæ¯å†…å®¹", "ç›‘æŽ§è´¦å·"}); err != nil {
 		return nil, err
 	}
 	for _, record := range records {
@@ -1865,26 +1864,26 @@ func encodeDMTemplateInput(input string) (string, error) {
 	mode := strings.ToLower(strings.TrimSpace(parts[0]))
 	value := strings.TrimSpace(parts[1])
 	if value == "" {
-		return "", fmt.Errorf("Ã¥Ââ€˜Ã©â‚¬ÂÃ¦Â¨Â¡Ã¥Â¼ÂÃ¥â€ â€¦Ã¥Â®Â¹Ã¤Â¸ÂÃ¨Æ’Â½Ã¤Â¸ÂºÃ§Â©Âº")
+		return "", fmt.Errorf("发送模式内容不能为空")
 	}
 
 	switch mode {
-	case "Ã¦â€“â€¡Ã¦Å“Â¬", "Ã¦â€“â€¡Ã¦Å“Â¬Ã§â€ºÂ´Ã¥Ââ€˜", "text":
+	case "文本", "文本直发", "text":
 		return model.EncodeTextDMTemplate(value), nil
-	case "postbot", "Ã¥â€ â€¦Ã¨Ââ€bot", "Ã¥â€ â€¦Ã¨Ââ€":
+	case "postbot", "内联bot", "内联":
 		return model.EncodePostBotDMTemplate(value), nil
-	case "Ã¨Â½Â¬Ã¥Ââ€˜", "Ã©Â¢â€˜Ã©Ââ€œÃ¨Â½Â¬Ã¥Ââ€˜", "Ã©Â¢â€˜Ã©Ââ€œÃ¨Â´Â´Ã¦â€“â€¡Ã¨Â½Â¬Ã¥Ââ€˜", "forward":
+	case "转发", "频道转发", "频道贴文转发", "forward":
 		return model.EncodeForwardDMTemplate(value), nil
-	case "Ã©Å¡ÂÃ¨â€”ÂÃ¨Â½Â¬Ã¥Ââ€˜", "Ã©Å¡ÂÃ¨â€”ÂÃ¦ÂÂ¥Ã¦ÂºÂ", "Ã©Å¡ÂÃ¨â€”ÂÃ¨Â½Â¬Ã¥Ââ€˜Ã¦ÂÂ¥Ã¦ÂºÂ", "forward_hidden", "hidden_forward":
+	case "隐藏转发", "隐藏来源", "隐藏转发来源", "forward_hidden", "hidden_forward":
 		return model.EncodeHiddenForwardDMTemplate(value), nil
-	case "Ã¥Â¿Â«Ã¦ÂÂ·Ã¥â€ºÅ¾Ã¥Â¤Â", "Ã¤Â¼ÂÃ¤Â¸Å¡Ã¥Â¿Â«Ã¦ÂÂ·Ã¥â€ºÅ¾Ã¥Â¤Â", "quick_reply", "quickreply":
+	case "快捷回复", "企业快捷回复", "quick_reply", "quickreply":
 		shortcutID, err := strconv.Atoi(value)
 		if err != nil || shortcutID <= 0 {
-			return "", fmt.Errorf("Ã¤Â¼ÂÃ¤Â¸Å¡Ã¥Â¿Â«Ã¦ÂÂ·Ã¥â€ºÅ¾Ã¥Â¤ÂÃ¦Â Â¼Ã¥Â¼ÂÃ¤Â¸ÂÃ¥Â¯Â¹Ã¯Â¼Å’Ã¨Â¯Â·Ã§â€Â¨ Ã¥Â¿Â«Ã¦ÂÂ·Ã¥â€ºÅ¾Ã¥Â¤Â::123 Ã¨Â¿â„¢Ã§Â§ÂÃ¦Â Â¼Ã¥Â¼Â")
+			return "", fmt.Errorf("企业快捷回复格式不对，请用 快捷回复::123 这种格式")
 		}
 		return model.EncodeQuickReplyDMTemplate(shortcutID), nil
 	default:
-		return "", fmt.Errorf("Ã¤Â¸ÂÃ¦â€Â¯Ã¦Å’ÂÃ§Å¡â€žÃ¥Ââ€˜Ã©â‚¬ÂÃ¦Â¨Â¡Ã¥Â¼ÂÃ¯Â¼Å¡%s", strings.TrimSpace(parts[0]))
+		return "", fmt.Errorf("不支持的发送模式：%s", strings.TrimSpace(parts[0]))
 	}
 }
 
@@ -1958,9 +1957,9 @@ func parseNonNegativeInt(text string) (int, error) {
 
 func onOff(v bool) string {
 	if v {
-		return "ÃƒÂ¥Ã‚Â¼Ã¢â€šÂ¬ÃƒÂ¥Ã‚ÂÃ‚Â¯"
+		return "å¼€å¯"
 	}
-	return "ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â³ÃƒÂ©Ã¢â‚¬â€Ã‚Â­"
+	return "å…³é—­"
 }
 
 func formatOptionalNumber(value int, disabled string) string {
@@ -1972,9 +1971,9 @@ func formatOptionalNumber(value int, disabled string) string {
 
 func dryRunLabel(enabled bool) string {
 	if enabled {
-		return "ÃƒÂ¦Ã‚Â¼Ã¢â‚¬ÂÃƒÂ§Ã‚Â»Ã†â€™ÃƒÂ¦Ã‚Â¨Ã‚Â¡ÃƒÂ¥Ã‚Â¼Ã‚ÂÃƒÂ¯Ã‚Â¼Ã‹â€ ÃƒÂ¤Ã‚Â¸Ã‚ÂÃƒÂ§Ã…â€œÃ…Â¸ÃƒÂ¥Ã‚Â®Ã…Â¾ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¯Ã‚Â¼Ã¢â‚¬Â°"
+		return "æ¼”ç»ƒæ¨¡å¼ï¼ˆä¸çœŸå®žç§ä¿¡ï¼‰"
 	}
-	return "ÃƒÂ§Ã…â€œÃ…Â¸ÃƒÂ¥Ã‚Â®Ã…Â¾ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚Â"
+	return "çœŸå®žå‘é€"
 }
 
 func (s *AdminService) editMessageText(ctx context.Context, chatID int64, messageID int64, text string, keyboard *model.InlineKeyboardMarkup) error {
@@ -2003,7 +2002,7 @@ func trimTelegramText(text string, limit int) string {
 	if limit <= 20 {
 		return string(runes[:limit])
 	}
-	return string(runes[:limit-12]) + "\n\nÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ ÃƒÂ¥Ã¢â‚¬Â Ã¢â‚¬Â¦ÃƒÂ¥Ã‚Â®Ã‚Â¹ÃƒÂ¨Ã‚Â¿Ã¢â‚¬Â¡ÃƒÂ©Ã¢â‚¬Â¢Ã‚Â¿ÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã‹â€ Ã‚ÂªÃƒÂ¦Ã¢â‚¬â€œÃ‚Â­"
+	return string(runes[:limit-12]) + "\n\nâ€¦â€¦ å†…å®¹è¿‡é•¿ï¼Œå·²æˆªæ–­"
 }
 
 func (s *AdminService) listMonitorAccounts() []MonitorAccountInfo {
@@ -2039,15 +2038,15 @@ func (s *AdminService) dmStatsToday() (sent, success, failed int) {
 
 func (s *AdminService) handleDMCheckAll(ctx context.Context, callback *model.CallbackQuery) error {
 	if s.dmManager == nil {
-		return s.client.AnswerCallbackQuery(ctx, callback.ID, "ÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ¦Ã‚Â²Ã‚Â¡ÃƒÂ¦Ã…â€œÃ¢â‚¬Â°ÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ§Ã¢â‚¬ÂÃ‚Â¨ÃƒÂ§Ã…Â¡Ã¢â‚¬Å¾ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ§Ã‚Â®Ã‚Â¡ÃƒÂ§Ã‚ÂÃ¢â‚¬Â ÃƒÂ¥Ã¢â€žÂ¢Ã‚Â¨")
+		return s.client.AnswerCallbackQuery(ctx, callback.ID, "å½“å‰æ²¡æœ‰å¯ç”¨çš„ç§ä¿¡å·ç®¡ç†å™¨")
 	}
 
 	accounts := s.listDMAccounts()
 	if len(accounts) == 0 {
-		return s.client.AnswerCallbackQuery(ctx, callback.ID, "ÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ¦Ã‚Â²Ã‚Â¡ÃƒÂ¦Ã…â€œÃ¢â‚¬Â°ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ¦Ã‚Â£Ã¢â€šÂ¬ÃƒÂ¦Ã…Â¸Ã‚Â¥")
+		return s.client.AnswerCallbackQuery(ctx, callback.ID, "å½“å‰æ²¡æœ‰ç§ä¿¡å·å¯æ£€æŸ¥")
 	}
 
-	if err := s.client.AnswerCallbackQuery(ctx, callback.ID, "ÃƒÂ¥Ã‚Â¼Ã¢â€šÂ¬ÃƒÂ¥Ã‚Â§Ã¢â‚¬Â¹ÃƒÂ¦Ã¢â‚¬Â°Ã‚Â¹ÃƒÂ©Ã¢â‚¬Â¡Ã‚ÂÃƒÂ¦Ã‚Â£Ã¢â€šÂ¬ÃƒÂ¦Ã…Â¸Ã‚Â¥ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ§Ã…Â Ã‚Â¶ÃƒÂ¦Ã¢â€šÂ¬Ã‚Â"); err != nil {
+	if err := s.client.AnswerCallbackQuery(ctx, callback.ID, "å¼€å§‹æ‰¹é‡æ£€æŸ¥ç§ä¿¡å·çŠ¶æ€"); err != nil {
 		return err
 	}
 
@@ -2074,42 +2073,42 @@ func (s *AdminService) handleDMCheckAll(ctx context.Context, callback *model.Cal
 }
 
 func (s *AdminService) handleDMExportAbnormal(ctx context.Context, callback *model.CallbackQuery) error {
-	if err := s.client.AnswerCallbackQuery(ctx, callback.ID, "ÃƒÂ¥Ã‚Â¼Ã¢â€šÂ¬ÃƒÂ¥Ã‚Â§Ã¢â‚¬Â¹ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¥Ã‚Â¼Ã¢â‚¬Å¡ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·"); err != nil {
+	if err := s.client.AnswerCallbackQuery(ctx, callback.ID, "å¼€å§‹å¯¼å‡ºå¼‚å¸¸ç§ä¿¡å·"); err != nil {
 		return err
 	}
 
 	accounts := s.collectDMAccountsByStatus(false)
 	if len(accounts) == 0 {
-		return s.editMessageText(ctx, callback.Message.Chat.ID, callback.Message.MessageID, "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ ÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ¦Ã‚Â²Ã‚Â¡ÃƒÂ¦Ã…â€œÃ¢â‚¬Â°ÃƒÂ¥Ã‚Â¼Ã¢â‚¬Å¡ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¦Ã¢â‚¬Â°Ã¢â€šÂ¬ÃƒÂ¦Ã…â€œÃ¢â‚¬Â°ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ©Ã†â€™Ã‚Â½ÃƒÂ¥Ã‚Â±Ã…Â¾ÃƒÂ¤Ã‚ÂºÃ…Â½ÃƒÂ¦Ã‚Â­Ã‚Â£ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶ÃƒÂ§Ã…Â Ã‚Â¶ÃƒÂ¦Ã¢â€šÂ¬Ã‚ÂÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.dmCheckActionsKeyboard())
+		return s.editMessageText(ctx, callback.Message.Chat.ID, callback.Message.MessageID, "âœ… å½“å‰æ²¡æœ‰å¼‚å¸¸ç§ä¿¡å·ï¼Œæ‰€æœ‰è´¦å·éƒ½å±žäºŽæ­£å¸¸æ— é™åˆ¶çŠ¶æ€ã€‚", s.dmCheckActionsKeyboard())
 	}
 
-	if err := s.sendDMAccountExportDocuments(ctx, callback.Message.Chat.ID, accounts, "ÃƒÂ¥Ã‚Â¼Ã¢â‚¬Å¡ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·"); err != nil {
+	if err := s.sendDMAccountExportDocuments(ctx, callback.Message.Chat.ID, accounts, "å¼‚å¸¸ç§ä¿¡å·"); err != nil {
 		return err
 	}
 
 	removed, failed := s.deleteDMAccounts(ctx, accounts)
-	text := fmt.Sprintf("ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¤ ÃƒÂ¥Ã‚Â¼Ã¢â‚¬Å¡ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚Âº\n\nÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚Âº: %d ÃƒÂ¤Ã‚Â¸Ã‚Âª\nÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã‹â€ Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤: %d ÃƒÂ¤Ã‚Â¸Ã‚Âª\nÃƒÂ¥Ã‹â€ Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤ÃƒÂ¥Ã‚Â¤Ã‚Â±ÃƒÂ¨Ã‚Â´Ã‚Â¥: %d ÃƒÂ¤Ã‚Â¸Ã‚Âª\n\nÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¤Ã‚Â¿Ã‚ÂÃƒÂ§Ã¢â‚¬Â¢Ã¢â€žÂ¢: ÃƒÂ¤Ã‚Â»Ã¢â‚¬Â¦ÃƒÂ¦Ã‚Â­Ã‚Â£ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·", len(accounts), removed, failed)
+	text := fmt.Sprintf("ðŸ“¤ å¼‚å¸¸è´¦å·å·²å¯¼å‡º\n\nå·²å¯¼å‡º: %d ä¸ª\nå·²åˆ é™¤: %d ä¸ª\nåˆ é™¤å¤±è´¥: %d ä¸ª\n\nå·²ä¿ç•™: ä»…æ­£å¸¸æ— é™åˆ¶è´¦å·", len(accounts), removed, failed)
 	return s.editMessageText(ctx, callback.Message.Chat.ID, callback.Message.MessageID, text, s.dmAccountsKeyboard())
 }
 
 func (s *AdminService) handleDMKeepOnlyNormal(ctx context.Context, callback *model.CallbackQuery) error {
-	if err := s.client.AnswerCallbackQuery(ctx, callback.ID, "ÃƒÂ¥Ã‚Â¼Ã¢â€šÂ¬ÃƒÂ¥Ã‚Â§Ã¢â‚¬Â¹ÃƒÂ¦Ã‚Â¸Ã¢â‚¬Â¦ÃƒÂ§Ã‚ÂÃ¢â‚¬Â ÃƒÂ¥Ã‚Â¼Ã¢â‚¬Å¡ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·"); err != nil {
+	if err := s.client.AnswerCallbackQuery(ctx, callback.ID, "å¼€å§‹æ¸…ç†å¼‚å¸¸ç§ä¿¡å·"); err != nil {
 		return err
 	}
 
 	accounts := s.collectDMAccountsByStatus(false)
 	if len(accounts) == 0 {
-		return s.editMessageText(ctx, callback.Message.Chat.ID, callback.Message.MessageID, "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ ÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ¦Ã‚Â²Ã‚Â¡ÃƒÂ¦Ã…â€œÃ¢â‚¬Â°ÃƒÂ¥Ã‚Â¼Ã¢â‚¬Å¡ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ§Ã‚Â»Ã‚ÂÃƒÂ¥Ã‚ÂÃ‚ÂªÃƒÂ¤Ã‚Â¿Ã‚ÂÃƒÂ§Ã¢â‚¬Â¢Ã¢â€žÂ¢ÃƒÂ¦Ã‚Â­Ã‚Â£ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", s.dmAccountsKeyboard())
+		return s.editMessageText(ctx, callback.Message.Chat.ID, callback.Message.MessageID, "âœ… å½“å‰æ²¡æœ‰å¼‚å¸¸ç§ä¿¡å·ï¼Œå·²ç»åªä¿ç•™æ­£å¸¸æ— é™åˆ¶è´¦å·ã€‚", s.dmAccountsKeyboard())
 	}
 
 	removed, failed := s.deleteDMAccounts(ctx, accounts)
-	text := fmt.Sprintf("ÃƒÂ°Ã…Â¸Ã‚Â§Ã‚Â¹ ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¦Ã‚Â±Ã‚Â ÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¦Ã‚Â¸Ã¢â‚¬Â¦ÃƒÂ§Ã‚ÂÃ¢â‚¬Â \n\nÃƒÂ¥Ã‚Â·Ã‚Â²ÃƒÂ¥Ã‹â€ Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤ÃƒÂ¥Ã‚Â¼Ã¢â‚¬Å¡ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·: %d ÃƒÂ¤Ã‚Â¸Ã‚Âª\nÃƒÂ¥Ã‹â€ Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤ÃƒÂ¥Ã‚Â¤Ã‚Â±ÃƒÂ¨Ã‚Â´Ã‚Â¥: %d ÃƒÂ¤Ã‚Â¸Ã‚Âª\nÃƒÂ¥Ã‚Â½Ã¢â‚¬Å“ÃƒÂ¥Ã¢â‚¬Â°Ã‚ÂÃƒÂ¥Ã‚ÂÃ‚ÂªÃƒÂ¤Ã‚Â¿Ã‚ÂÃƒÂ§Ã¢â‚¬Â¢Ã¢â€žÂ¢ÃƒÂ¦Ã‚Â­Ã‚Â£ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡", removed, failed)
+	text := fmt.Sprintf("ðŸ§¹ ç§ä¿¡å·æ± å·²æ¸…ç†\n\nå·²åˆ é™¤å¼‚å¸¸è´¦å·: %d ä¸ª\nåˆ é™¤å¤±è´¥: %d ä¸ª\nå½“å‰åªä¿ç•™æ­£å¸¸æ— é™åˆ¶è´¦å·ã€‚", removed, failed)
 	return s.editMessageText(ctx, callback.Message.Chat.ID, callback.Message.MessageID, text, s.dmAccountsKeyboard())
 }
 
 func (s *AdminService) dmCheckProgressText(done, total int, counts map[string]int) string {
 	return fmt.Sprintf(
-		"ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ‚Â ÃƒÂ¦Ã‚Â­Ã‚Â£ÃƒÂ¥Ã…â€œÃ‚Â¨ÃƒÂ¦Ã‚Â£Ã¢â€šÂ¬ÃƒÂ¦Ã…Â¸Ã‚Â¥ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ§Ã…Â Ã‚Â¶ÃƒÂ¦Ã¢â€šÂ¬Ã‚Â (%d/%d)\n\n%s",
+		"ðŸ” æ­£åœ¨æ£€æŸ¥ç§ä¿¡å·çŠ¶æ€ (%d/%d)\n\n%s",
 		done,
 		total,
 		formatDMStatusCounts(counts),
@@ -2118,7 +2117,7 @@ func (s *AdminService) dmCheckProgressText(done, total int, counts map[string]in
 
 func (s *AdminService) dmCheckResultText(total int, counts map[string]int) string {
 	return fmt.Sprintf(
-		"ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ§Ã…Â Ã‚Â¶ÃƒÂ¦Ã¢â€šÂ¬Ã‚ÂÃƒÂ¦Ã‚Â£Ã¢â€šÂ¬ÃƒÂ¦Ã…Â¸Ã‚Â¥ÃƒÂ¥Ã‚Â®Ã…â€™ÃƒÂ¦Ã‹â€ Ã‚Â\n\nÃƒÂ¦Ã¢â€šÂ¬Ã‚Â»ÃƒÂ¨Ã‚Â®Ã‚Â¡: %d ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·\n%s\nÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â ÃƒÂ¦Ã…Â½Ã‚Â¥ÃƒÂ¤Ã‚Â¸Ã¢â‚¬Â¹ÃƒÂ¦Ã‚ÂÃ‚Â¥ÃƒÂ¤Ã‚Â½Ã‚Â ÃƒÂ¥Ã‚ÂÃ‚Â¯ÃƒÂ¤Ã‚Â»Ã‚Â¥ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¥Ã‚Â¼Ã¢â‚¬Å¡ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¯Ã‚Â¼Ã…â€™ÃƒÂ¦Ã‹â€ Ã¢â‚¬â€œÃƒÂ¨Ã¢â€šÂ¬Ã¢â‚¬Â¦ÃƒÂ§Ã¢â‚¬ÂºÃ‚Â´ÃƒÂ¦Ã…Â½Ã‚Â¥ÃƒÂ¥Ã‚ÂÃ‚ÂªÃƒÂ¤Ã‚Â¿Ã‚ÂÃƒÂ§Ã¢â‚¬Â¢Ã¢â€žÂ¢ÃƒÂ¦Ã‚Â­Ã‚Â£ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ£Ã¢â€šÂ¬Ã¢â‚¬Å¡",
+		"âœ… ç§ä¿¡å·çŠ¶æ€æ£€æŸ¥å®Œæˆ\n\næ€»è®¡: %d ä¸ªè´¦å·\n%s\nâš ï¸ æŽ¥ä¸‹æ¥ä½ å¯ä»¥å¯¼å‡ºå¼‚å¸¸è´¦å·ï¼Œæˆ–è€…ç›´æŽ¥åªä¿ç•™æ­£å¸¸æ— é™åˆ¶è´¦å·ã€‚",
 		total,
 		formatDMStatusCounts(counts),
 	)
@@ -2128,12 +2127,12 @@ func (s *AdminService) dmCheckActionsKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¤ ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¥Ã‚Â¼Ã¢â‚¬Å¡ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ¥Ã‚Â¹Ã‚Â¶ÃƒÂ¥Ã‹â€ Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚Â¤", CallbackData: callbackDMExportAbnormal},
-				{Text: "ÃƒÂ°Ã…Â¸Ã‚Â§Ã‚Â¹ ÃƒÂ¤Ã‚Â»Ã¢â‚¬Â¦ÃƒÂ¤Ã‚Â¿Ã‚ÂÃƒÂ§Ã¢â‚¬Â¢Ã¢â€žÂ¢ÃƒÂ¦Ã‚Â­Ã‚Â£ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·", CallbackData: callbackDMKeepOnlyNormal},
+				{Text: "ðŸ“¤ å¯¼å‡ºå¼‚å¸¸å¹¶åˆ é™¤", CallbackData: callbackDMExportAbnormal},
+				{Text: "ðŸ§¹ ä»…ä¿ç•™æ­£å¸¸è´¦å·", CallbackData: callbackDMKeepOnlyNormal},
 			},
 			{
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾ÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¥Ã‹â€ Ã¢â‚¬â€ÃƒÂ¨Ã‚Â¡Ã‚Â¨", CallbackData: callbackDMList},
-				{Text: "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ¢â€žÂ¢ ÃƒÂ¨Ã‚Â¿Ã¢â‚¬ÂÃƒÂ¥Ã¢â‚¬ÂºÃ…Â¾ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¥Ã‚ÂÃ‚Â·ÃƒÂ¦Ã‚Â±Ã‚Â ", CallbackData: callbackDMPool},
+				{Text: "ðŸ“‹ è¿”å›žè´¦å·åˆ—è¡¨", CallbackData: callbackDMList},
+				{Text: "ðŸ”™ è¿”å›žç§ä¿¡å·æ± ", CallbackData: callbackDMPool},
 			},
 		},
 	}
@@ -2177,7 +2176,7 @@ func (s *AdminService) sendDMAccountExportDocuments(ctx context.Context, chatID 
 	}
 	if sessionCount > 0 {
 		filename := fmt.Sprintf("dm_abnormal_sessions_%s.zip", timestamp)
-		caption := fmt.Sprintf("ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â¦ %s Session ÃƒÂ¦Ã¢â‚¬Â°Ã¢â‚¬Å“ÃƒÂ¥Ã…â€™Ã¢â‚¬Â¦ÃƒÂ¯Ã‚Â¼Ã‹â€ %d ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ¯Ã‚Â¼Ã¢â‚¬Â°", label, sessionCount)
+		caption := fmt.Sprintf("ðŸ“¦ %s Session æ‰“åŒ…ï¼ˆ%d ä¸ªï¼‰", label, sessionCount)
 		if err := s.client.SendDocument(ctx, chatID, filename, zipData, caption); err != nil {
 			return err
 		}
@@ -2185,7 +2184,7 @@ func (s *AdminService) sendDMAccountExportDocuments(ctx context.Context, chatID 
 
 	reportData := buildDMAccountReport(accounts, label)
 	reportName := fmt.Sprintf("dm_abnormal_accounts_%s.txt", timestamp)
-	reportCaption := fmt.Sprintf("ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ %sÃƒÂ¥Ã‹â€ Ã¢â‚¬â€ÃƒÂ¨Ã‚Â¡Ã‚Â¨ÃƒÂ¯Ã‚Â¼Ã‹â€ %d ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ¯Ã‚Â¼Ã¢â‚¬Â°", label, len(accounts))
+	reportCaption := fmt.Sprintf("ðŸ“‹ %såˆ—è¡¨ï¼ˆ%d ä¸ªï¼‰", label, len(accounts))
 	return s.client.SendDocument(ctx, chatID, reportName, reportData, reportCaption)
 }
 
@@ -2226,15 +2225,15 @@ func buildDMAccountSessionsZip(accounts []DMAccountInfo) ([]byte, int, error) {
 func buildDMAccountReport(accounts []DMAccountInfo, label string) []byte {
 	lines := []string{
 		fmt.Sprintf("# %s", label),
-		fmt.Sprintf("# ÃƒÂ¥Ã‚Â¯Ã‚Â¼ÃƒÂ¥Ã¢â‚¬Â¡Ã‚ÂºÃƒÂ¦Ã¢â‚¬â€Ã‚Â¶ÃƒÂ©Ã¢â‚¬â€Ã‚Â´: %s", time.Now().Format("2006-01-02 15:04:05")),
-		fmt.Sprintf("# ÃƒÂ¥Ã¢â‚¬Â¦Ã‚Â± %d ÃƒÂ¤Ã‚Â¸Ã‚ÂªÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·", len(accounts)),
+		fmt.Sprintf("# å¯¼å‡ºæ—¶é—´: %s", time.Now().Format("2006-01-02 15:04:05")),
+		fmt.Sprintf("# å…± %d ä¸ªè´¦å·", len(accounts)),
 		"",
 	}
 
 	for _, account := range accounts {
 		code := effectiveDMStatusCode(account)
 		line := fmt.Sprintf(
-			"%s | %s | ÃƒÂ¤Ã‚Â»Ã…Â ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¥ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€šÂ¬Ã‚Â %d ÃƒÂ¦Ã‚ÂÃ‚Â¡ | ÃƒÂ¤Ã‚Â»Ã…Â ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¥ÃƒÂ¦Ã‹â€ Ã‚ÂÃƒÂ¥Ã…Â Ã…Â¸ %d ÃƒÂ¦Ã‚ÂÃ‚Â¡ | ÃƒÂ¤Ã‚Â»Ã…Â ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¥ÃƒÂ¥Ã‚Â¤Ã‚Â±ÃƒÂ¨Ã‚Â´Ã‚Â¥ %d ÃƒÂ¦Ã‚ÂÃ‚Â¡",
+			"%s | %s | ä»Šæ—¥å‘é€ %d æ¡ | ä»Šæ—¥æˆåŠŸ %d æ¡ | ä»Šæ—¥å¤±è´¥ %d æ¡",
 			account.Phone,
 			dmStatusLabel(code),
 			account.TodaySent,
@@ -2264,15 +2263,15 @@ func newDMStatusCounts() map[string]int {
 
 func formatDMStatusCounts(counts map[string]int) string {
 	lines := []string{
-		fmt.Sprintf("ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ ÃƒÂ¦Ã‚Â­Ã‚Â£ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶: %d", counts["active"]),
-		fmt.Sprintf("ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â ÃƒÂ¤Ã‚Â¸Ã‚Â´ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¶ÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶ / ÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶: %d", counts["restricted"]),
-		fmt.Sprintf("ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Âµ ÃƒÂ¥Ã…Â¾Ã†â€™ÃƒÂ¥Ã…â€œÃ‚Â¾ÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã‚Â£Ã…Â½ÃƒÂ¦Ã…Â½Ã‚Â§: %d", counts["spam"]),
-		fmt.Sprintf("ÃƒÂ°Ã…Â¸Ã…Â¡Ã‚Â« ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ§Ã‚Â¦Ã‚ÂÃƒÂ¨Ã‚Â´Ã‚Â¦ÃƒÂ¥Ã‚ÂÃ‚Â·: %d", counts["banned"]),
-		fmt.Sprintf("ÃƒÂ¢Ã‚ÂÃ¢â‚¬Å¾ÃƒÂ¯Ã‚Â¸Ã‚Â ÃƒÂ¥Ã¢â‚¬Â Ã‚Â»ÃƒÂ§Ã‚Â»Ã¢â‚¬Å“ / ÃƒÂ¥Ã‚Â®Ã‚Â¡ÃƒÂ¦Ã‚Â Ã‚Â¸ÃƒÂ¤Ã‚Â¸Ã‚Â­: %d", counts["frozen"]),
-		fmt.Sprintf("ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ…â€™ ÃƒÂ§Ã‚Â¦Ã‚Â»ÃƒÂ§Ã‚ÂºÃ‚Â¿ / ÃƒÂ¦Ã‚Â£Ã¢â€šÂ¬ÃƒÂ¦Ã…Â¸Ã‚Â¥ÃƒÂ¥Ã‚Â¤Ã‚Â±ÃƒÂ¨Ã‚Â´Ã‚Â¥: %d", counts["failed"]),
+		fmt.Sprintf("âœ… æ­£å¸¸æ— é™åˆ¶: %d", counts["active"]),
+		fmt.Sprintf("âš ï¸ ä¸´æ—¶é™åˆ¶ / åŒå‘é™åˆ¶: %d", counts["restricted"]),
+		fmt.Sprintf("ðŸ“µ åžƒåœ¾æ¶ˆæ¯é£ŽæŽ§: %d", counts["spam"]),
+		fmt.Sprintf("ðŸš« å°ç¦è´¦å·: %d", counts["banned"]),
+		fmt.Sprintf("â„ï¸ å†»ç»“ / å®¡æ ¸ä¸­: %d", counts["frozen"]),
+		fmt.Sprintf("ðŸ”Œ ç¦»çº¿ / æ£€æŸ¥å¤±è´¥: %d", counts["failed"]),
 	}
 	if counts["unknown"] > 0 {
-		lines = append(lines, fmt.Sprintf("ÃƒÂ¢Ã‚ÂÃ¢â‚¬Å“ ÃƒÂ¦Ã…â€œÃ‚ÂªÃƒÂ¨Ã‚Â¯Ã¢â‚¬Â ÃƒÂ¥Ã‹â€ Ã‚Â«ÃƒÂ§Ã…Â Ã‚Â¶ÃƒÂ¦Ã¢â€šÂ¬Ã‚Â: %d", counts["unknown"]))
+		lines = append(lines, fmt.Sprintf("â“ æœªè¯†åˆ«çŠ¶æ€: %d", counts["unknown"]))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -2285,17 +2284,17 @@ func effectiveDMStatusCode(account DMAccountInfo) string {
 
 	summary := strings.ToLower(strings.TrimSpace(account.StatusSummary))
 	switch {
-	case strings.Contains(summary, "ÃƒÂ¦Ã‚Â­Ã‚Â£ÃƒÂ¥Ã‚Â¸Ã‚Â¸"), strings.Contains(summary, "ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶"):
+	case strings.Contains(summary, "æ­£å¸¸"), strings.Contains(summary, "æ— é™åˆ¶"):
 		return "active"
-	case strings.Contains(summary, "ÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ¥Ã‚ÂÃ¢â‚¬Ëœ"), strings.Contains(summary, "ÃƒÂ¤Ã‚Â¸Ã‚Â´ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¶ÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶"):
+	case strings.Contains(summary, "åŒå‘"), strings.Contains(summary, "ä¸´æ—¶é™åˆ¶"):
 		return "restricted"
-	case strings.Contains(summary, "ÃƒÂ©Ã‚Â£Ã…Â½ÃƒÂ¦Ã…Â½Ã‚Â§"), strings.Contains(summary, "ÃƒÂ¥Ã…Â¾Ã†â€™ÃƒÂ¥Ã…â€œÃ‚Â¾ÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯"):
+	case strings.Contains(summary, "é£ŽæŽ§"), strings.Contains(summary, "åžƒåœ¾æ¶ˆæ¯"):
 		return "spam"
-	case strings.Contains(summary, "ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ§Ã‚Â¦Ã‚Â"), strings.Contains(summary, "ÃƒÂ¦Ã‚Â°Ã‚Â¸ÃƒÂ¤Ã‚Â¹Ã¢â‚¬Â¦ÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶"):
+	case strings.Contains(summary, "å°ç¦"), strings.Contains(summary, "æ°¸ä¹…é™åˆ¶"):
 		return "banned"
-	case strings.Contains(summary, "ÃƒÂ¥Ã‚Â®Ã‚Â¡ÃƒÂ¦Ã‚Â Ã‚Â¸"), strings.Contains(summary, "ÃƒÂ©Ã‚ÂªÃ…â€™ÃƒÂ¨Ã‚Â¯Ã‚Â"), strings.Contains(summary, "ÃƒÂ¥Ã¢â‚¬Â Ã‚Â»ÃƒÂ§Ã‚Â»Ã¢â‚¬Å“"):
+	case strings.Contains(summary, "å®¡æ ¸"), strings.Contains(summary, "éªŒè¯"), strings.Contains(summary, "å†»ç»“"):
 		return "frozen"
-	case strings.Contains(summary, "ÃƒÂ¥Ã‚Â¤Ã‚Â±ÃƒÂ¨Ã‚Â´Ã‚Â¥"), strings.Contains(summary, "ÃƒÂ§Ã‚Â¦Ã‚Â»ÃƒÂ§Ã‚ÂºÃ‚Â¿"):
+	case strings.Contains(summary, "å¤±è´¥"), strings.Contains(summary, "ç¦»çº¿"):
 		return "failed"
 	default:
 		return "unknown"
@@ -2314,19 +2313,19 @@ func normalizeDMStatusCode(code string) string {
 func dmStatusLabel(code string) string {
 	switch normalizeDMStatusCode(code) {
 	case "active":
-		return "ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ ÃƒÂ¦Ã‚Â­Ã‚Â£ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ¦Ã¢â‚¬â€Ã‚Â ÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶"
+		return "âœ… æ­£å¸¸æ— é™åˆ¶"
 	case "restricted":
-		return "ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â ÃƒÂ¤Ã‚Â¸Ã‚Â´ÃƒÂ¦Ã¢â‚¬â€Ã‚Â¶ÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶ / ÃƒÂ¥Ã‚ÂÃ…â€™ÃƒÂ¥Ã‚ÂÃ¢â‚¬ËœÃƒÂ©Ã¢â€žÂ¢Ã‚ÂÃƒÂ¥Ã‹â€ Ã‚Â¶"
+		return "âš ï¸ ä¸´æ—¶é™åˆ¶ / åŒå‘é™åˆ¶"
 	case "spam":
-		return "ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Âµ ÃƒÂ¥Ã…Â¾Ã†â€™ÃƒÂ¥Ã…â€œÃ‚Â¾ÃƒÂ¦Ã‚Â¶Ã‹â€ ÃƒÂ¦Ã‚ÂÃ‚Â¯ÃƒÂ©Ã‚Â£Ã…Â½ÃƒÂ¦Ã…Â½Ã‚Â§"
+		return "ðŸ“µ åžƒåœ¾æ¶ˆæ¯é£ŽæŽ§"
 	case "banned":
-		return "ÃƒÂ°Ã…Â¸Ã…Â¡Ã‚Â« ÃƒÂ¥Ã‚Â°Ã‚ÂÃƒÂ§Ã‚Â¦Ã‚Â"
+		return "ðŸš« å°ç¦"
 	case "frozen":
-		return "ÃƒÂ¢Ã‚ÂÃ¢â‚¬Å¾ÃƒÂ¯Ã‚Â¸Ã‚Â ÃƒÂ¥Ã¢â‚¬Â Ã‚Â»ÃƒÂ§Ã‚Â»Ã¢â‚¬Å“ / ÃƒÂ¥Ã‚Â®Ã‚Â¡ÃƒÂ¦Ã‚Â Ã‚Â¸ÃƒÂ¤Ã‚Â¸Ã‚Â­"
+		return "â„ï¸ å†»ç»“ / å®¡æ ¸ä¸­"
 	case "failed":
-		return "ÃƒÂ°Ã…Â¸Ã¢â‚¬ÂÃ…â€™ ÃƒÂ§Ã‚Â¦Ã‚Â»ÃƒÂ§Ã‚ÂºÃ‚Â¿ / ÃƒÂ¦Ã‚Â£Ã¢â€šÂ¬ÃƒÂ¦Ã…Â¸Ã‚Â¥ÃƒÂ¥Ã‚Â¤Ã‚Â±ÃƒÂ¨Ã‚Â´Ã‚Â¥"
+		return "ðŸ”Œ ç¦»çº¿ / æ£€æŸ¥å¤±è´¥"
 	default:
-		return "ÃƒÂ¢Ã‚ÂÃ¢â‚¬Å“ ÃƒÂ¦Ã…â€œÃ‚ÂªÃƒÂ¨Ã‚Â¯Ã¢â‚¬Â ÃƒÂ¥Ã‹â€ Ã‚Â«"
+		return "â“ æœªè¯†åˆ«"
 	}
 }
 
@@ -2339,7 +2338,7 @@ func (s *AdminService) sendFailedDMExport(ctx context.Context, chatID int64) err
 		}
 	}
 	if len(failed) == 0 {
-		return fmt.Errorf("ÃƒÂ¦Ã‚Â²Ã‚Â¡ÃƒÂ¦Ã…â€œÃ¢â‚¬Â°ÃƒÂ¥Ã‚Â¼Ã¢â‚¬Å¡ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¨Ã‚Â®Ã‚Â°ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢")
+		return fmt.Errorf("æ²¡æœ‰å¼‚å¸¸ç§ä¿¡è®°å½•")
 	}
 
 	lines := make([]string, 0, len(failed))
@@ -2356,7 +2355,7 @@ func (s *AdminService) sendFailedDMExport(ctx context.Context, chatID int64) err
 	}
 
 	filename := fmt.Sprintf("jtbot_failed_dm_%s.txt", time.Now().Format("20060102_150405"))
-	return s.client.SendDocument(ctx, chatID, filename, []byte(strings.Join(lines, "\n")), fmt.Sprintf("ÃƒÂ¥Ã‚Â¼Ã¢â‚¬Å¡ÃƒÂ¥Ã‚Â¸Ã‚Â¸ÃƒÂ§Ã‚Â§Ã‚ÂÃƒÂ¤Ã‚Â¿Ã‚Â¡ÃƒÂ¨Ã‚Â®Ã‚Â°ÃƒÂ¥Ã‚Â½Ã¢â‚¬Â¢ %d ÃƒÂ¦Ã‚ÂÃ‚Â¡", len(failed)))
+	return s.client.SendDocument(ctx, chatID, filename, []byte(strings.Join(lines, "\n")), fmt.Sprintf("å¼‚å¸¸ç§ä¿¡è®°å½• %d æ¡", len(failed)))
 }
 
 func (s *AdminService) setPending(userID int64, action pendingAction) {
