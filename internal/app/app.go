@@ -837,7 +837,7 @@ func (a *App) clearDMAccountError(phone string) {
 	}
 }
 
-func (a *App) SendDM(ctx context.Context, fallback *tg.Client, job model.DMJob, text string) (string, error) {
+func (a *App) SendDM(ctx context.Context, _ *tg.Client, job model.DMJob, text string) (string, error) {
 	a.runMu.Lock()
 	accounts := a.dmStore.List()
 	available := make([]string, 0, len(accounts))
@@ -863,18 +863,10 @@ func (a *App) SendDM(ctx context.Context, fallback *tg.Client, job model.DMJob, 
 		if err := selectedClient.SendDirectMessage(ctx, job.TargetUserID, job.Username, text); err == nil {
 			return selectedPhone, nil
 		}
+		return selectedPhone, fmt.Errorf("私信号 %s 发送失败", selectedPhone)
 	}
 
-	if fallback == nil {
-		if selectedPhone != "" {
-			return selectedPhone, fmt.Errorf("私信号 %s 发送失败，且没有可用回退监控号", selectedPhone)
-		}
-		return "", errors.New("没有可用的私信发送账号")
-	}
-	if err := fallback.SendDirectMessage(ctx, job.TargetUserID, job.Username, text); err != nil {
-		return fallback.Label(), err
-	}
-	return fallback.Label(), nil
+	return "", errors.New("没有可用的私信发送账号，请先在私信号池添加或上传私信号")
 }
 
 func (a *App) notifyAdmin(ctx context.Context, text string) {
