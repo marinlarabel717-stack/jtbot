@@ -13,7 +13,7 @@ import (
 )
 
 type DMDispatcher interface {
-	SendDM(ctx context.Context, fallback *tg.Client, job model.DMJob, text string) (string, error)
+	SendDM(ctx context.Context, fallback *tg.Client, job model.DMJob, payload model.DMTemplatePayload) (string, error)
 }
 
 type Sender struct {
@@ -53,14 +53,14 @@ func (s *Sender) Run(ctx context.Context, jobs <-chan model.DMJob) {
 }
 
 func (s *Sender) handleJob(ctx context.Context, job model.DMJob) {
-	text := s.renderTemplate(job)
+	payload := s.renderTemplate(job)
 	record := model.DMRecord{
 		UserID:     job.TargetUserID,
 		Username:   job.Username,
 		ChatID:     job.ChatID,
 		Keywords:   append([]string(nil), job.Keywords...),
 		SourceText: job.SourceText,
-		Message:    text,
+		Message:    payload.Summary(),
 		SentAt:     time.Now(),
 	}
 
@@ -78,9 +78,9 @@ func (s *Sender) handleJob(ctx context.Context, job model.DMJob) {
 	}
 	var err error
 	if s.dispatcher != nil {
-		senderLabel, err = s.dispatcher.SendDM(ctx, s.client, job, text)
+		senderLabel, err = s.dispatcher.SendDM(ctx, s.client, job, payload)
 	} else {
-		err = s.client.SendDirectMessage(ctx, job.TargetUserID, job.Username, text)
+		err = s.client.SendDirectMessage(ctx, job.TargetUserID, job.Username, payload.Message)
 	}
 	record.Sender = senderLabel
 
@@ -99,14 +99,12 @@ func (s *Sender) handleJob(ctx context.Context, job model.DMJob) {
 	s.logger.Infof("私信发送成功：用户=%d，关键词=%s，发送账号=%s", job.TargetUserID, strings.Join(job.Keywords, ","), senderLabel)
 }
 
-func (s *Sender) renderTemplate(job model.DMJob) string {
-	replacer := strings.NewReplacer(
-		"{username}", safeValue(job.Username, "friend"),
-		"{chat_title}", safeValue(job.ChatTitle, "group"),
-		"{keywords}", strings.Join(job.Keywords, ", "),
-		"{message}", job.SourceText,
-	)
-	return replacer.Replace(s.settings.DMTemplate())
+func (s *Sender) renderTemplate(job model.DMJob) model.DMTemplatePayload {
+	raw := strings.TrimSpace(s.settings.RandomDMTemplate())
+	if raw == "" {
+		raw = model.EncodeTextDMTemplate(s.settings.DMTemplate())
+	}
+	return model.ParseDMTemplate(raw).Render(job)
 }
 
 func safeValue(value, fallback string) string {

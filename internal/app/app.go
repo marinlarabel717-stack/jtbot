@@ -934,7 +934,7 @@ func (a *App) clearDMAccountError(phone string) {
 	}
 }
 
-func (a *App) SendDM(ctx context.Context, _ *tg.Client, job model.DMJob, text string) (string, error) {
+func (a *App) SendDM(ctx context.Context, _ *tg.Client, job model.DMJob, payload model.DMTemplatePayload) (string, error) {
 	a.runMu.Lock()
 	accounts := a.dmStore.List()
 	available := make([]string, 0, len(accounts))
@@ -968,7 +968,8 @@ func (a *App) SendDM(ctx context.Context, _ *tg.Client, job model.DMJob, text st
 		if runtime == nil || runtime.client == nil {
 			continue
 		}
-		if err := runtime.client.SendDirectMessage(ctx, job.TargetUserID, job.Username, text); err == nil {
+		err := a.sendWithMode(ctx, runtime.client, job, payload)
+		if err == nil {
 			a.clearDMAccountSendError(phone)
 			return phone, nil
 		} else {
@@ -982,6 +983,25 @@ func (a *App) SendDM(ctx context.Context, _ *tg.Client, job model.DMJob, text st
 	}
 	a.alertDMUnavailable(ctx, fmt.Sprintf("当前在线私信号共 %d 个，但全部发送失败，请及时补充新号或检查风控。\n最后失败原因：%s", len(ordered), lastErr.Error()))
 	return "", lastErr
+}
+
+func (a *App) sendWithMode(ctx context.Context, client *tg.Client, job model.DMJob, payload model.DMTemplatePayload) error {
+	if client == nil {
+		return errors.New("私信号当前不可用")
+	}
+
+	switch payload.Mode {
+	case model.DMTemplateModePostBot:
+		return client.SendInlineBotResult(ctx, job.TargetUserID, job.Username, payload.PostBotBot, payload.PostBotCode)
+	case model.DMTemplateModeForward:
+		return client.ForwardMessageFromLink(ctx, job.TargetUserID, job.Username, payload.SourceLink, false)
+	case model.DMTemplateModeForwardHidden:
+		return client.ForwardMessageFromLink(ctx, job.TargetUserID, job.Username, payload.SourceLink, true)
+	case model.DMTemplateModeQuickReply:
+		return client.SendQuickReplyShortcut(ctx, job.TargetUserID, job.Username, payload.ShortcutID)
+	default:
+		return client.SendDirectMessage(ctx, job.TargetUserID, job.Username, payload.Message)
+	}
 }
 
 func (a *App) notifyAdmin(ctx context.Context, text string) {

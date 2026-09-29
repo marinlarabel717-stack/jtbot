@@ -21,7 +21,7 @@ type stubDispatcher struct {
 	err   error
 }
 
-func (s stubDispatcher) SendDM(context.Context, *tg.Client, model.DMJob, string) (string, error) {
+func (s stubDispatcher) SendDM(context.Context, *tg.Client, model.DMJob, model.DMTemplatePayload) (string, error) {
 	return s.label, s.err
 }
 

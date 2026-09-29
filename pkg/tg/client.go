@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf16"
 
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
@@ -205,6 +206,148 @@ func (c *Client) SendDirectMessage(ctx context.Context, userID int64, username, 
 		return err
 	}
 	return c.sendText(ctx, peer, text)
+}
+
+func (c *Client) SendInlineBotResult(ctx context.Context, userID int64, username, botUsername, query string) error {
+	if c.baseURL != "" {
+		return errors.New("Bot API 模式不支持内联 Bot 结果发送")
+	}
+
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return errors.New("PostBot 代码不能为空")
+	}
+
+	peer, err := c.lookupPeer(userID)
+	if err != nil && strings.TrimSpace(username) != "" {
+		peer, err = c.resolveUsernamePeer(ctx, username)
+	}
+	if err != nil {
+		return err
+	}
+
+	bot, err := c.resolveUsernameUser(ctx, botUsername)
+	if err != nil {
+		return fmt.Errorf("无法定位内联 Bot：%w", err)
+	}
+
+	api, err := c.apiClient()
+	if err != nil {
+		return err
+	}
+	results, err := api.MessagesGetInlineBotResults(ctx, &mtproto.MessagesGetInlineBotResultsRequest{
+		Bot:    bot,
+		Peer:   peer,
+		Query:  query,
+		Offset: "",
+	})
+	if err != nil {
+		return fmt.Errorf("获取 PostBot 结果失败：%w", err)
+	}
+	if len(results.Results) == 0 {
+		return errors.New("PostBot 没有返回可发送结果，代码可能无效")
+	}
+	inlineResult, ok := results.Results[0].(interface{ GetID() string })
+	if !ok || strings.TrimSpace(inlineResult.GetID()) == "" {
+		return errors.New("PostBot 返回结果异常，缺少可发送的结果 ID")
+	}
+
+	randomID, err := randomInt64()
+	if err != nil {
+		return err
+	}
+	_, err = api.MessagesSendInlineBotResult(ctx, &mtproto.MessagesSendInlineBotResultRequest{
+		Peer:     peer,
+		RandomID: randomID,
+		QueryID:  results.QueryID,
+		ID:       inlineResult.GetID(),
+		HideVia:  true,
+	})
+	if err != nil {
+		return fmt.Errorf("发送 PostBot 结果失败：%w", err)
+	}
+	return nil
+}
+
+func (c *Client) ForwardMessageFromLink(ctx context.Context, userID int64, username, messageLink string, hideSource bool) error {
+	if c.baseURL != "" {
+		return errors.New("Bot API 模式不支持频道贴文转发")
+	}
+
+	sourceUsername, messageID, err := parseTelegramMessageLink(messageLink)
+	if err != nil {
+		return err
+	}
+
+	targetPeer, err := c.lookupPeer(userID)
+	if err != nil && strings.TrimSpace(username) != "" {
+		targetPeer, err = c.resolveUsernamePeer(ctx, username)
+	}
+	if err != nil {
+		return err
+	}
+
+	sourcePeer, err := c.resolveUsernamePeer(ctx, sourceUsername)
+	if err != nil {
+		return fmt.Errorf("无法定位来源频道：%w", err)
+	}
+
+	randomID, err := randomInt64()
+	if err != nil {
+		return err
+	}
+
+	api, err := c.apiClient()
+	if err != nil {
+		return err
+	}
+	_, err = api.MessagesForwardMessages(ctx, &mtproto.MessagesForwardMessagesRequest{
+		FromPeer:   sourcePeer,
+		ID:         []int{messageID},
+		RandomID:   []int64{randomID},
+		ToPeer:     targetPeer,
+		DropAuthor: hideSource,
+	})
+	if err != nil {
+		return fmt.Errorf("转发频道贴文失败：%w", err)
+	}
+	return nil
+}
+
+func (c *Client) SendQuickReplyShortcut(ctx context.Context, userID int64, username string, shortcutID int) error {
+	if c.baseURL != "" {
+		return errors.New("Bot API 模式不支持企业快捷回复")
+	}
+	if shortcutID <= 0 {
+		return errors.New("企业快捷回复 ID 必须大于 0")
+	}
+
+	peer, err := c.lookupPeer(userID)
+	if err != nil && strings.TrimSpace(username) != "" {
+		peer, err = c.resolveUsernamePeer(ctx, username)
+	}
+	if err != nil {
+		return err
+	}
+
+	randomID, err := randomInt64()
+	if err != nil {
+		return err
+	}
+
+	api, err := c.apiClient()
+	if err != nil {
+		return err
+	}
+	_, err = api.MessagesSendQuickReplyMessages(ctx, &mtproto.MessagesSendQuickReplyMessagesRequest{
+		Peer:       peer,
+		ShortcutID: shortcutID,
+		RandomID:   []int64{randomID},
+	})
+	if err != nil {
+		return fmt.Errorf("发送企业快捷回复失败：%w", err)
+	}
+	return nil
 }
 
 func (c *Client) CheckSpamBotStatus(ctx context.Context) (string, string, bool, error) {
@@ -570,6 +713,47 @@ func (c *Client) resolveUsernamePeer(ctx context.Context, username string) (mtpr
 	return nil, fmt.Errorf("resolved username %s but peer is unavailable", username)
 }
 
+func (c *Client) resolveUsernameUser(ctx context.Context, username string) (mtproto.InputUserClass, error) {
+	c.mu.RLock()
+	api := c.api
+	c.mu.RUnlock()
+	if api == nil {
+		return nil, errors.New("telegram api is not ready")
+	}
+
+	username = strings.TrimSpace(strings.TrimPrefix(username, "@"))
+	if username == "" {
+		return nil, errors.New("username is empty")
+	}
+
+	result, err := api.ContactsResolveUsername(ctx, &mtproto.ContactsResolveUsernameRequest{
+		Username: username,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, user := range result.MapUsers() {
+		u, ok := user.(*mtproto.User)
+		if !ok || u == nil {
+			continue
+		}
+		resolvedUsername, _ := u.GetUsername()
+		accessHash, ok := u.GetAccessHash()
+		if !ok {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(resolvedUsername), username) || u.ID != 0 {
+			return &mtproto.InputUser{
+				UserID:     u.ID,
+				AccessHash: accessHash,
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("resolved username %s but user is unavailable", username)
+}
+
 func (c *Client) lookupPeer(id int64) (mtproto.InputPeerClass, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -583,6 +767,15 @@ func (c *Client) lookupPeer(id int64) (mtproto.InputPeerClass, error) {
 		return nil, fmt.Errorf("peer %d not cached yet; wait until this account sees that user/chat in updates", id)
 	}
 	return peer, nil
+}
+
+func (c *Client) apiClient() (*mtproto.Client, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.api == nil {
+		return nil, errors.New("telegram api is not ready")
+	}
+	return c.api, nil
 }
 
 func (c *Client) sendText(ctx context.Context, peer mtproto.InputPeerClass, text string) error {
@@ -599,11 +792,16 @@ func (c *Client) sendText(ctx context.Context, peer mtproto.InputPeerClass, text
 		return err
 	}
 
-	_, err = api.MessagesSendMessage(ctx, &mtproto.MessagesSendMessageRequest{
+	req := &mtproto.MessagesSendMessageRequest{
 		Peer:     peer,
 		Message:  text,
 		RandomID: randomID,
-	})
+	}
+	if entities := buildMessageEntities(text); len(entities) > 0 {
+		req.SetEntities(entities)
+	}
+
+	_, err = api.MessagesSendMessage(ctx, req)
 	return err
 }
 
@@ -669,6 +867,82 @@ func containsAny(text string, patterns ...string) bool {
 		}
 	}
 	return false
+}
+
+func parseTelegramMessageLink(raw string) (string, int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", 0, errors.New("频道消息链接不能为空")
+	}
+
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", 0, errors.New("频道消息链接格式不对")
+	}
+	path := strings.Trim(parsed.Path, "/")
+	parts := strings.Split(path, "/")
+	if parsed.Host != "t.me" && parsed.Host != "www.t.me" {
+		return "", 0, errors.New("目前只支持公开频道的 t.me 消息链接")
+	}
+	if len(parts) < 2 || parts[0] == "c" {
+		return "", 0, errors.New("目前只支持公开频道消息链接，例如 https://t.me/channel/123")
+	}
+
+	messageID, err := strconv.Atoi(parts[1])
+	if err != nil || messageID <= 0 {
+		return "", 0, errors.New("频道消息链接里的消息 ID 不合法")
+	}
+
+	return parts[0], messageID, nil
+}
+
+func buildMessageEntities(text string) []mtproto.MessageEntityClass {
+	runes := []rune(text)
+	if len(runes) == 0 {
+		return nil
+	}
+
+	entities := make([]mtproto.MessageEntityClass, 0, 2)
+	for i := 0; i < len(runes); i++ {
+		if runes[i] != '@' {
+			continue
+		}
+		if i > 0 && isMentionChar(runes[i-1]) {
+			continue
+		}
+
+		j := i + 1
+		for j < len(runes) && isMentionChar(runes[j]) {
+			j++
+		}
+		if j == i+1 {
+			continue
+		}
+
+		username := string(runes[i+1 : j])
+		mention := "@" + username
+		offset := utf16Len(string(runes[:i]))
+		length := utf16Len(mention)
+		entities = append(entities, &mtproto.MessageEntityTextURL{
+			Offset: offset,
+			Length: length,
+			URL:    "https://t.me/" + username,
+		})
+		i = j - 1
+	}
+
+	return entities
+}
+
+func isMentionChar(r rune) bool {
+	return (r >= 'a' && r <= 'z') ||
+		(r >= 'A' && r <= 'Z') ||
+		(r >= '0' && r <= '9') ||
+		r == '_'
+}
+
+func utf16Len(text string) int {
+	return len(utf16.Encode([]rune(text)))
 }
 
 func mapTelegramUser(user *mtproto.User) *model.User {

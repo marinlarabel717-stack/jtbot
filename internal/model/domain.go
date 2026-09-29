@@ -169,3 +169,151 @@ type DMJob struct {
 	SourceText   string
 	TriggeredAt  time.Time
 }
+
+const (
+	DMTemplateModeText          = "text"
+	DMTemplateModePostBot       = "postbot"
+	DMTemplateModeForward       = "forward"
+	DMTemplateModeForwardHidden = "forward_hidden"
+	DMTemplateModeQuickReply    = "quick_reply"
+)
+
+type DMTemplatePayload struct {
+	Mode        string
+	Message     string
+	PostBotBot  string
+	PostBotCode string
+	SourceLink  string
+	ShortcutID  int
+	Raw         string
+}
+
+func EncodeTextDMTemplate(text string) string {
+	return DMTemplateModeText + "::" + strings.TrimSpace(text)
+}
+
+func EncodePostBotDMTemplate(code string) string {
+	return DMTemplateModePostBot + "::PostBot::" + strings.TrimSpace(code)
+}
+
+func EncodeForwardDMTemplate(link string) string {
+	return DMTemplateModeForward + "::" + strings.TrimSpace(link)
+}
+
+func EncodeHiddenForwardDMTemplate(link string) string {
+	return DMTemplateModeForwardHidden + "::" + strings.TrimSpace(link)
+}
+
+func EncodeQuickReplyDMTemplate(shortcutID int) string {
+	return DMTemplateModeQuickReply + "::" + strconv.Itoa(shortcutID)
+}
+
+func ParseDMTemplate(raw string) DMTemplatePayload {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return DMTemplatePayload{Mode: DMTemplateModeText, Raw: raw}
+	}
+
+	parts := strings.Split(raw, "::")
+	mode := strings.TrimSpace(parts[0])
+	switch mode {
+	case DMTemplateModeText:
+		return DMTemplatePayload{
+			Mode:    DMTemplateModeText,
+			Message: strings.Join(parts[1:], "::"),
+			Raw:     raw,
+		}
+	case DMTemplateModePostBot:
+		payload := DMTemplatePayload{
+			Mode:       DMTemplateModePostBot,
+			PostBotBot: "PostBot",
+			Raw:        raw,
+		}
+		if len(parts) >= 2 {
+			payload.PostBotBot = strings.TrimSpace(parts[1])
+		}
+		if len(parts) >= 3 {
+			payload.PostBotCode = strings.Join(parts[2:], "::")
+		}
+		return payload
+	case DMTemplateModeForward:
+		return DMTemplatePayload{
+			Mode:       DMTemplateModeForward,
+			SourceLink: strings.Join(parts[1:], "::"),
+			Raw:        raw,
+		}
+	case DMTemplateModeForwardHidden:
+		return DMTemplatePayload{
+			Mode:       DMTemplateModeForwardHidden,
+			SourceLink: strings.Join(parts[1:], "::"),
+			Raw:        raw,
+		}
+	case DMTemplateModeQuickReply:
+		payload := DMTemplatePayload{
+			Mode: DMTemplateModeQuickReply,
+			Raw:  raw,
+		}
+		if len(parts) >= 2 {
+			payload.ShortcutID, _ = strconv.Atoi(strings.TrimSpace(parts[1]))
+		}
+		return payload
+	default:
+		return DMTemplatePayload{
+			Mode:    DMTemplateModeText,
+			Message: raw,
+			Raw:     raw,
+		}
+	}
+}
+
+func (p DMTemplatePayload) Render(job DMJob) DMTemplatePayload {
+	if p.Mode != DMTemplateModeText {
+		return p
+	}
+
+	replacer := strings.NewReplacer(
+		"{username}", dmSafeTemplateValue(job.Username, "friend"),
+		"{chat_title}", dmSafeTemplateValue(job.ChatTitle, "group"),
+		"{keywords}", strings.Join(job.Keywords, ", "),
+		"{message}", job.SourceText,
+	)
+	p.Message = replacer.Replace(strings.TrimSpace(p.Message))
+	if p.Raw == "" {
+		p.Raw = EncodeTextDMTemplate(p.Message)
+	}
+	return p
+}
+
+func (p DMTemplatePayload) Summary() string {
+	switch p.Mode {
+	case DMTemplateModePostBot:
+		return "内联Bot @PostBot | " + dmSafeTemplateValue(p.PostBotCode, "未填写代码")
+	case DMTemplateModeForward:
+		return "频道贴文转发 | " + dmSafeTemplateValue(p.SourceLink, "未填写链接")
+	case DMTemplateModeForwardHidden:
+		return "隐藏转发来源 | " + dmSafeTemplateValue(p.SourceLink, "未填写链接")
+	case DMTemplateModeQuickReply:
+		if p.ShortcutID > 0 {
+			return "企业快捷回复 | 快捷回复 ID " + strconv.Itoa(p.ShortcutID)
+		}
+		return "企业快捷回复 | 未填写快捷回复 ID"
+	default:
+		return "文本直发 | " + dmTrimPreview(p.Message, 30)
+	}
+}
+
+func dmSafeTemplateValue(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return strings.TrimSpace(value)
+}
+
+func dmTrimPreview(value string, limit int) string {
+	value = strings.TrimSpace(value)
+	if len([]rune(value)) <= limit || limit <= 0 {
+		return value
+	}
+	runes := []rune(value)
+	return string(runes[:limit]) + "..."
+}

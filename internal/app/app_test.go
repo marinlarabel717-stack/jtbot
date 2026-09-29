@@ -39,7 +39,7 @@ func TestSendDMDoesNotFallbackToMonitorAccount(t *testing.T) {
 	senderLabel, err := app.SendDM(context.Background(), fallback, model.DMJob{
 		TargetUserID: 12345,
 		Username:     "target_user",
-	}, "hello")
+	}, model.ParseDMTemplate(model.EncodeTextDMTemplate("hello")))
 	if err == nil {
 		t.Fatal("expected send dm to fail without dm accounts")
 	}
@@ -85,7 +85,7 @@ func TestSendDMUsesUploadedDMAccount(t *testing.T) {
 	senderLabel, err := app.SendDM(context.Background(), nil, model.DMJob{
 		TargetUserID: 67890,
 		Username:     "real_dm",
-	}, "hello")
+	}, model.ParseDMTemplate(model.EncodeTextDMTemplate("hello")))
 	if err != nil {
 		t.Fatalf("expected dm send to succeed, got %v", err)
 	}
