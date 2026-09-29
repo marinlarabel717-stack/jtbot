@@ -107,7 +107,19 @@ func TestTranslateDMErrorUsernameNotOccupied(t *testing.T) {
 	t.Parallel()
 
 	got := TranslateDMError(errors.New("rpcDoRequest: rpc error code 400: USERNAME_NOT_OCCUPIED"))
-	if !strings.Contains(got, "目标用户名已经不存在了") {
+	if !strings.Contains(got, "按这个 @用户名 没有解析到目标用户") {
+		t.Fatalf("expected plain-language translation, got %q", got)
+	}
+	if strings.Contains(got, "目标用户名已经不存在了") {
+		t.Fatalf("translation is too absolute, got %q", got)
+	}
+}
+
+func TestTranslateDMErrorTargetPeerResolveFallback(t *testing.T) {
+	t.Parallel()
+
+	got := TranslateDMError(errors.New("peer 7439554002 not cached and username @sdhs999 could not be resolved by current account: rpcDoRequest: rpc error code 400: USERNAME_NOT_OCCUPIED"))
+	if !strings.Contains(got, "既没有缓存到对方会话") {
 		t.Fatalf("expected plain-language translation, got %q", got)
 	}
 }

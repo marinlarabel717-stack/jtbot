@@ -198,10 +198,7 @@ func (c *Client) SendDirectMessage(ctx context.Context, userID int64, username, 
 		return c.SendMessage(ctx, userID, text, nil)
 	}
 
-	peer, err := c.lookupPeer(userID)
-	if err != nil && strings.TrimSpace(username) != "" {
-		peer, err = c.resolveUsernamePeer(ctx, username)
-	}
+	peer, err := c.resolveTargetPeer(ctx, userID, username)
 	if err != nil {
 		return err
 	}
@@ -218,10 +215,7 @@ func (c *Client) SendInlineBotResult(ctx context.Context, userID int64, username
 		return errors.New("PostBot 代码不能为空")
 	}
 
-	peer, err := c.lookupPeer(userID)
-	if err != nil && strings.TrimSpace(username) != "" {
-		peer, err = c.resolveUsernamePeer(ctx, username)
-	}
+	peer, err := c.resolveTargetPeer(ctx, userID, username)
 	if err != nil {
 		return err
 	}
@@ -279,10 +273,7 @@ func (c *Client) ForwardMessageFromLink(ctx context.Context, userID int64, usern
 		return err
 	}
 
-	targetPeer, err := c.lookupPeer(userID)
-	if err != nil && strings.TrimSpace(username) != "" {
-		targetPeer, err = c.resolveUsernamePeer(ctx, username)
-	}
+	targetPeer, err := c.resolveTargetPeer(ctx, userID, username)
 	if err != nil {
 		return err
 	}
@@ -322,10 +313,7 @@ func (c *Client) SendQuickReplyShortcut(ctx context.Context, userID int64, usern
 		return errors.New("企业快捷回复 ID 必须大于 0")
 	}
 
-	peer, err := c.lookupPeer(userID)
-	if err != nil && strings.TrimSpace(username) != "" {
-		peer, err = c.resolveUsernamePeer(ctx, username)
-	}
+	peer, err := c.resolveTargetPeer(ctx, userID, username)
 	if err != nil {
 		return err
 	}
@@ -752,6 +740,26 @@ func (c *Client) resolveUsernameUser(ctx context.Context, username string) (mtpr
 	}
 
 	return nil, fmt.Errorf("resolved username %s but user is unavailable", username)
+}
+
+func (c *Client) resolveTargetPeer(ctx context.Context, userID int64, username string) (mtproto.InputPeerClass, error) {
+	peer, err := c.lookupPeer(userID)
+	if err == nil {
+		return peer, nil
+	}
+
+	lookupErr := err
+	cleanUsername := strings.TrimSpace(strings.TrimPrefix(username, "@"))
+	if cleanUsername == "" {
+		return nil, lookupErr
+	}
+
+	peer, err = c.resolveUsernamePeer(ctx, cleanUsername)
+	if err == nil {
+		return peer, nil
+	}
+
+	return nil, fmt.Errorf("peer %d not cached and username @%s could not be resolved by current account: %w", userID, cleanUsername, err)
 }
 
 func (c *Client) lookupPeer(id int64) (mtproto.InputPeerClass, error) {

@@ -177,8 +177,10 @@ func TranslateDMError(err error) string {
 	case strings.Contains(lower, "no usable dm sending account"),
 		strings.Contains(lower, "没有可用的私信发送账号"):
 		return "没有可用的私信号，请先去私信号池补充账号"
+	case strings.Contains(lower, "could not be resolved by current account"):
+		return "这个私信号既没有缓存到对方会话，也没能按对方当前的 @用户名 解析到他，所以这次发不出去。常见原因是：对方刚改过用户名、你拿到的是旧用户名，或者这个私信号当前查不到对方资料"
 	case strings.Contains(lower, "username_not_occupied"):
-		return "目标用户名已经不存在了，通常是对方改名、注销，或者你拿到的是旧用户名；当前账号也没能通过用户 ID 直接定位到他，所以这次发不出去"
+		return "当前私信号按这个 @用户名 没有解析到目标用户，所以这次发不出去。常见原因是：对方改过用户名、这个用户名已经失效，或者当前私信号查不到对方资料"
 	case strings.Contains(lower, "peer not cached yet"):
 		return "这个私信号还没识别过目标用户，当前没有和对方建立可发送的会话，所以暂时发不出去"
 	case strings.Contains(lower, "telegram api is not ready"):
