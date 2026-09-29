@@ -2,8 +2,12 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/marinlarabel717-stack/jtbot/internal/logx"
@@ -120,6 +124,64 @@ func TestTriggerServiceSkipsLongMessageWhenEnabled(t *testing.T) {
 	}
 	if got := len(recordStore.MatchRecords()); got != 0 {
 		t.Fatalf("expected 0 match records, got %d", got)
+	}
+}
+
+func TestTriggerServiceFormatsAlertText(t *testing.T) {
+	t.Parallel()
+
+	var sentText string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode payload: %v", err)
+		}
+		sentText, _ = payload["text"].(string)
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "result": map[string]any{"message_id": 1}})
+	}))
+	defer server.Close()
+
+	svc, _, _ := newTriggerTestService(t, storage.RuntimeSettings{
+		MonitoringEnabled: true,
+		MonitorChatIDs:    []int64{-100123},
+		CooldownMinutes:   60,
+		AlertChatID:       999,
+		DMTemplate:        "hi",
+	})
+	svc.alertClient = tg.NewClientWithBaseURL(server.URL)
+
+	err := svc.HandleUpdate(context.Background(), model.Update{
+		UpdateID: 1,
+		Message: &model.Message{
+			MessageID: 99,
+			From: &model.User{
+				ID:        2019667492,
+				Username:  "UUZVI",
+				FirstName: "大户人家-数据",
+			},
+			Chat: model.Chat{
+				ID:       -100123,
+				Title:    "头铁出海 项目资源交流 4群",
+				Username: "toutiechuhai04",
+			},
+			Text: "合作 TG 高级渗透料子 ws tg实时料高活跃",
+		},
+	})
+	if err != nil {
+		t.Fatalf("handle update: %v", err)
+	}
+
+	if !strings.Contains(sentText, "精准获客-自动私信") {
+		t.Fatalf("expected branded alert text, got %q", sentText)
+	}
+	if !strings.Contains(sentText, "来源群组: 头铁出海 项目资源交流 4群") {
+		t.Fatalf("expected chat title in alert text, got %q", sentText)
+	}
+	if !strings.Contains(sentText, "群组链接: https://t.me/toutiechuhai04") {
+		t.Fatalf("expected chat link in alert text, got %q", sentText)
+	}
+	if !strings.Contains(sentText, "发送用户: 大户人家-数据 (@UUZVI)") {
+		t.Fatalf("expected user label in alert text, got %q", sentText)
 	}
 }
 

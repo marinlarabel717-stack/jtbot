@@ -637,7 +637,7 @@ func (a *App) startMonitorAccount(ctx context.Context, account storage.MonitorAc
 	a.runMu.Unlock()
 
 	jobQueue := queue.NewMessageQueue(a.cfg.QueueSize)
-	dmSender := sender.New(client, a, a.recordStore, a.settings, a.logger)
+	dmSender := sender.New(client, a, a.recordStore, a.settings, a.logger, a.adminBot)
 	triggerSvc := service.NewTriggerService(
 		a.matcher,
 		a.keywordStore,

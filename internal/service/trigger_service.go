@@ -105,11 +105,10 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 
 	chatTitle := msg.Chat.Title
 	if chatTitle == "" {
-		chatTitle = msg.Chat.Username
+		chatTitle = msg.Chat.DisplayTitle()
 	}
-	if chatTitle == "" {
-		chatTitle = "unknown"
-	}
+	chatLink := msg.Chat.Link(msg.MessageID)
+	matchedAt := time.Now()
 
 	for _, keyword := range keywords {
 		s.recordStore.SaveMatchRecord(model.MatchRecord{
@@ -121,7 +120,7 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 			Keyword:   keyword,
 			Message:   content,
 			Monitor:   s.monitorLabel,
-			MatchedAt: time.Now(),
+			MatchedAt: matchedAt,
 			UpdateID:  update.UpdateID,
 			MessageID: msg.MessageID,
 		})
@@ -130,26 +129,11 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 	s.logger.Infof("matched monitor=%s user=%d chat=%d keywords=%s", s.monitorLabel, msg.From.ID, msg.Chat.ID, strings.Join(keywords, ","))
 
 	if alertChatID := s.settings.AlertChatID(); alertChatID != 0 {
-		alertText := fmt.Sprintf(
-			"关键词命中\n监控号: %s\n群: %s\n用户: %s (%d)\n关键词: %s\n消息: %s",
-			s.monitorLabel,
-			chatTitle,
-			formatUserLabel(msg.From),
-			msg.From.ID,
-			strings.Join(keywords, ", "),
-			content,
-		)
+		alertText := formatMatchAlertText(chatTitle, chatLink, msg.From, s.monitorLabel, keywords, matchedAt, content)
 		alertClient := s.alertClient
 		replyMarkup := (*model.InlineKeyboardMarkup)(nil)
 		if alertClient != nil {
-			replyMarkup = &model.InlineKeyboardMarkup{
-				InlineKeyboard: [][]model.InlineKeyboardButton{
-					{
-						{Text: "拉黑用户", CallbackData: fmt.Sprintf("admin:blacklist:user:%d:%s", msg.From.ID, safeUsername(msg.From.Username))},
-						{Text: "拉黑群", CallbackData: fmt.Sprintf("admin:blacklist:chat:%d", msg.Chat.ID)},
-					},
-				},
-			}
+			replyMarkup = buildMatchAlertKeyboard(msg, chatLink)
 		} else {
 			alertClient = s.client
 		}
@@ -165,12 +149,14 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 
 	return s.queue.Publish(ctx, model.DMJob{
 		TargetUserID: msg.From.ID,
+		TargetLabel:  formatAlertUserLabel(msg.From),
 		Username:     msg.From.Username,
 		ChatID:       msg.Chat.ID,
 		ChatTitle:    chatTitle,
+		ChatLink:     chatLink,
 		Keywords:     keywords,
 		SourceText:   content,
-		TriggeredAt:  time.Now(),
+		TriggeredAt:  matchedAt,
 	})
 }
 
@@ -192,6 +178,74 @@ func formatUserLabel(user *model.User) string {
 		return name
 	}
 	return "no_username"
+}
+
+func formatAlertUserLabel(user *model.User) string {
+	if user == nil {
+		return "unknown"
+	}
+
+	name := strings.TrimSpace(user.FirstName + " " + user.LastName)
+	username := strings.TrimSpace(user.Username)
+	switch {
+	case name != "" && username != "":
+		return fmt.Sprintf("%s (@%s)", name, username)
+	case username != "":
+		return "@" + username
+	case name != "":
+		return name
+	default:
+		return "no_username"
+	}
+}
+
+func formatMatchAlertText(chatTitle, chatLink string, user *model.User, monitorLabel string, keywords []string, matchedAt time.Time, content string) string {
+	lines := []string{
+		"精准获客-自动私信",
+		"🔔 关键词触发提醒",
+		"",
+		fmt.Sprintf("📍 来源群组: %s", safeValue(chatTitle, "unknown")),
+		fmt.Sprintf("🔗 群组链接: %s", safeValue(chatLink, "暂无公开链接")),
+		fmt.Sprintf("👤 发送用户: %s", formatAlertUserLabel(user)),
+		fmt.Sprintf("🆔 用户ID: %d", userID(user)),
+		fmt.Sprintf("🔑 触发关键词: %s", strings.Join(keywords, ", ")),
+		fmt.Sprintf("📱 监控账号: %s", safeValue(monitorLabel, "unknown")),
+		fmt.Sprintf("⏰ 时间: %s", matchedAt.Format("2006-01-02 15:04:05")),
+		"",
+		"📝 消息内容:",
+		content,
+	}
+	return strings.Join(lines, "\n")
+}
+
+func buildMatchAlertKeyboard(msg *model.Message, chatLink string) *model.InlineKeyboardMarkup {
+	rows := make([][]model.InlineKeyboardButton, 0, 3)
+	if strings.TrimSpace(chatLink) != "" {
+		rows = append(rows, []model.InlineKeyboardButton{
+			{Text: "🚀 直达消息", URL: chatLink},
+		})
+	}
+	rows = append(rows,
+		[]model.InlineKeyboardButton{
+			{Text: "🚫 屏蔽用户", CallbackData: fmt.Sprintf("admin:blacklist:user:%d:%s", msg.From.ID, safeUsername(msg.From.Username))},
+			{Text: "🚫 屏蔽此群", CallbackData: fmt.Sprintf("admin:blacklist:chat:%d", msg.Chat.ID)},
+		},
+	)
+	return &model.InlineKeyboardMarkup{InlineKeyboard: rows}
+}
+
+func safeValue(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
+}
+
+func userID(user *model.User) int64 {
+	if user == nil {
+		return 0
+	}
+	return user.ID
 }
 
 func estimateAccountAgeDays(userID int64) int {

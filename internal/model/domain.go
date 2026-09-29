@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"strconv"
+	"strings"
+	"time"
+)
 
 type Update struct {
 	UpdateID      int            `json:"update_id"`
@@ -31,6 +35,34 @@ type Chat struct {
 	Type     string `json:"type"`
 	Title    string `json:"title"`
 	Username string `json:"username"`
+}
+
+func (c Chat) DisplayTitle() string {
+	if title := strings.TrimSpace(c.Title); title != "" {
+		return title
+	}
+	if username := strings.TrimSpace(c.Username); username != "" {
+		return username
+	}
+	return "unknown"
+}
+
+func (c Chat) Link(messageID int64) string {
+	if username := strings.TrimSpace(strings.TrimPrefix(c.Username, "@")); username != "" {
+		return "https://t.me/" + username
+	}
+	if messageID <= 0 {
+		return ""
+	}
+
+	rawID := strconv.FormatInt(c.ID, 10)
+	if strings.HasPrefix(rawID, "-100") {
+		internalID := strings.TrimPrefix(rawID, "-100")
+		if internalID != "" {
+			return "https://t.me/c/" + internalID + "/" + strconv.FormatInt(messageID, 10)
+		}
+	}
+	return ""
 }
 
 type User struct {
@@ -102,9 +134,11 @@ type DMRecord struct {
 
 type DMJob struct {
 	TargetUserID int64
+	TargetLabel  string
 	Username     string
 	ChatID       int64
 	ChatTitle    string
+	ChatLink     string
 	Keywords     []string
 	SourceText   string
 	TriggeredAt  time.Time
