@@ -29,6 +29,7 @@ const (
 	callbackKeywordRemove       = "admin:keyword:remove"
 	callbackDMPool              = "admin:dm_pool"
 	callbackDMConnect           = "admin:dm:connect"
+	callbackDMUpload            = "admin:dm:upload"
 	callbackDMList              = "admin:dm:list"
 	callbackDMDetailPrefix      = "admin:dm:detail:"
 	callbackDMRetryPrefix       = "admin:dm:retry:"
@@ -73,6 +74,7 @@ const (
 	pendingNone          pendingAction = ""
 	pendingLoginMonitor  pendingAction = "login_monitor"
 	pendingLoginDM       pendingAction = "login_dm"
+	pendingUploadDMSess  pendingAction = "upload_dm_session"
 	pendingAddKeywords   pendingAction = "add_keywords"
 	pendingRemoveKeyword pendingAction = "remove_keywords"
 	pendingSetCooldown   pendingAction = "set_cooldown"
@@ -134,6 +136,7 @@ type MonitorLoginManager interface {
 
 type DMPoolManager interface {
 	StartDMLogin(ctx context.Context, phone string) (string, error)
+	ImportDMSessions(ctx context.Context, filename string, data []byte) (string, error)
 	DMCounts() (active int, total int)
 	ListDMAccounts() []DMAccountInfo
 	GetDMAccount(phone string) (DMAccountInfo, bool)
@@ -146,6 +149,10 @@ type messageClient interface {
 	EditMessageText(ctx context.Context, chatID int64, messageID int64, text string, replyMarkup *model.InlineKeyboardMarkup) error
 	AnswerCallbackQuery(ctx context.Context, callbackQueryID, text string) error
 	SendDocument(ctx context.Context, chatID int64, filename string, data []byte, caption string) error
+}
+
+type fileDownloader interface {
+	DownloadFile(ctx context.Context, fileID string) (string, []byte, error)
 }
 
 type AdminService struct {
@@ -208,6 +215,18 @@ func (s *AdminService) handleMessage(ctx context.Context, msg *model.Message) (b
 		return false, nil
 	}
 
+	action := s.getPending(msg.From.ID)
+	if action == pendingUploadDMSess {
+		if msg.Document == nil {
+			return true, s.client.SendMessage(ctx, msg.Chat.ID, "请发送 `.session` 或 `.zip` 文件。", s.dmPoolKeyboard())
+		}
+		err := s.handlePendingDMUpload(ctx, msg)
+		if err == nil {
+			s.clearPending(msg.From.ID)
+		}
+		return true, err
+	}
+
 	text := strings.TrimSpace(msg.Content())
 	switch text {
 	case "/start", "/menu":
@@ -227,7 +246,6 @@ func (s *AdminService) handleMessage(ctx context.Context, msg *model.Message) (b
 		}
 	}
 
-	action := s.getPending(msg.From.ID)
 	if action == pendingNone {
 		return false, nil
 	}
@@ -278,6 +296,10 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 		s.setPending(callback.From.ID, pendingLoginDM)
 		text, keyboard = s.dmConnectPrompt(), s.dmPoolKeyboard()
 		alert = "把私信号手机号直接发给我"
+	case callbackDMUpload:
+		s.setPending(callback.From.ID, pendingUploadDMSess)
+		text, keyboard = s.dmUploadPrompt(), s.dmPoolKeyboard()
+		alert = "把 session 文件直接发给我"
 	case callbackDMList:
 		text, keyboard = s.dmAccountsText(), s.dmAccountsKeyboard()
 	case callbackDMTemplates:
@@ -624,6 +646,44 @@ func (s *AdminService) handlePendingInput(ctx context.Context, msg *model.Messag
 	}
 }
 
+func (s *AdminService) handlePendingDMUpload(ctx context.Context, msg *model.Message) error {
+	if msg.Document == nil {
+		return s.client.SendMessage(ctx, msg.Chat.ID, "请发送 `.session` 或 `.zip` 文件。", s.dmPoolKeyboard())
+	}
+	if s.dmManager == nil {
+		return s.client.SendMessage(ctx, msg.Chat.ID, "当前没有可用的私信号管理器。", s.dmPoolKeyboard())
+	}
+
+	filename := strings.TrimSpace(msg.Document.FileName)
+	lowerName := strings.ToLower(filename)
+	if !strings.HasSuffix(lowerName, ".session") && !strings.HasSuffix(lowerName, ".zip") {
+		return s.client.SendMessage(ctx, msg.Chat.ID, "文件格式不支持，仅支持 `.session` 或 `.zip`。", s.dmPoolKeyboard())
+	}
+
+	downloader, ok := s.client.(fileDownloader)
+	if !ok {
+		return s.client.SendMessage(ctx, msg.Chat.ID, "当前 Bot API 客户端不支持下载文件。", s.dmPoolKeyboard())
+	}
+
+	if err := s.client.SendMessage(ctx, msg.Chat.ID, "开始下载并导入 Session，数量多时会稍等一会儿。", nil); err != nil {
+		return err
+	}
+
+	downloadedName, data, err := downloader.DownloadFile(ctx, msg.Document.FileID)
+	if err != nil {
+		return s.client.SendMessage(ctx, msg.Chat.ID, "下载文件失败: "+err.Error(), s.dmPoolKeyboard())
+	}
+	if strings.TrimSpace(filename) == "" {
+		filename = downloadedName
+	}
+
+	result, err := s.dmManager.ImportDMSessions(ctx, filename, data)
+	if err != nil {
+		return s.client.SendMessage(ctx, msg.Chat.ID, "导入 Session 失败: "+err.Error(), s.dmPoolKeyboard())
+	}
+	return s.client.SendMessage(ctx, msg.Chat.ID, result+"\n\n"+s.dmPoolText(), s.dmPoolKeyboard())
+}
+
 func (s *AdminService) mainText() string {
 	active, total := 0, 0
 	if s.monitorManager != nil {
@@ -723,7 +783,7 @@ func (s *AdminService) dmPoolText() string {
 	todaySent, todaySuccess, todayFailed := s.dmStatsToday()
 	templates := s.settings.ListDMTemplates()
 	return fmt.Sprintf(
-		"💬 私信号池\n\n已登录账号: %d\n在线: %d | 离线: %d\n话术模板: %d 条\n今日私信: 发送 %d | 成功 %d | 失败 %d\n\nGo 版这里改成“手机号手动登录多个私信号”，不再依赖 Python 的 Telethon session 上传链路。",
+		"💬 私信号池\n\n已登录账号: %d\n在线: %d | 离线: %d\n话术模板: %d 条\n今日私信: 发送 %d | 成功 %d | 失败 %d\n\n支持两种接入方式：\n• 手动输入手机号登录\n• 上传 Telethon `.session` / `.zip` 批量导入",
 		total,
 		active,
 		total-active,
@@ -738,10 +798,14 @@ func (s *AdminService) dmConnectPrompt() string {
 	return "请输入私信号手机号。\n\n支持格式：\n• +8613800138000\n• 8613800138000\n• +66955305284"
 }
 
+func (s *AdminService) dmUploadPrompt() string {
+	return "请发送 Telethon `.session` 文件，或一个包含多个 `.session` 的 `.zip` 压缩包。\n\n上传后会自动批量导入并尝试拉起私信号。"
+}
+
 func (s *AdminService) dmAccountsText() string {
 	accounts := s.listDMAccounts()
 	if len(accounts) == 0 {
-		return "❌ 暂无私信号\n\n点击“连接私信号”开始添加。"
+		return "❌ 暂无私信号\n\n点击“连接私信号”手动登录，或点“上传 Session”批量导入。"
 	}
 
 	lines := []string{fmt.Sprintf("📋 私信号列表 (%d个)：", len(accounts)), ""}
@@ -1031,6 +1095,9 @@ func (s *AdminService) dmPoolKeyboard() *model.InlineKeyboardMarkup {
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{
 				{Text: "🔌 连接私信号", CallbackData: callbackDMConnect},
+				{Text: "📤 上传 Session", CallbackData: callbackDMUpload},
+			},
+			{
 				{Text: "📋 账号列表", CallbackData: callbackDMList},
 			},
 			{
@@ -1060,7 +1127,10 @@ func (s *AdminService) dmAccountsKeyboard() *model.InlineKeyboardMarkup {
 		})
 	}
 	rows = append(rows,
-		[]model.InlineKeyboardButton{{Text: "🔌 连接私信号", CallbackData: callbackDMConnect}},
+		[]model.InlineKeyboardButton{
+			{Text: "🔌 连接私信号", CallbackData: callbackDMConnect},
+			{Text: "📤 上传 Session", CallbackData: callbackDMUpload},
+		},
 		[]model.InlineKeyboardButton{{Text: "🔙 返回", CallbackData: callbackDMPool}},
 	)
 	return &model.InlineKeyboardMarkup{InlineKeyboard: rows}

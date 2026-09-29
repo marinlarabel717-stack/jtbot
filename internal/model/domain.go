@@ -39,6 +39,7 @@ type User struct {
 	FirstName    string `json:"first_name"`
 	LastName     string `json:"last_name"`
 	Username     string `json:"username"`
+	Phone        string `json:"phone,omitempty"`
 	LanguageCode string `json:"language_code"`
 	HasAvatar    bool   `json:"has_avatar"`
 }

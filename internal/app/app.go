@@ -328,6 +328,49 @@ func (a *App) StartDMLogin(ctx context.Context, phone string) (string, error) {
 	return fmt.Sprintf("已添加私信号 %s，并开始登录流程。收到验证码或两步密码提示后，直接在这里发送即可。", account.Phone), nil
 }
 
+func (a *App) ImportDMSessions(ctx context.Context, filename string, data []byte) (string, error) {
+	files, err := tg.ExtractTelethonSessionFiles(filename, data)
+	if err != nil {
+		return "", err
+	}
+
+	runCtx, err := a.currentRunContext()
+	if err != nil {
+		return "", err
+	}
+
+	imported := 0
+	failed := 0
+	details := make([]string, 0, len(files))
+	for _, file := range files {
+		phone, err := a.importSingleDMSession(ctx, runCtx, file)
+		if err != nil {
+			failed++
+			details = append(details, fmt.Sprintf("- %s: %v", file.Name, err))
+			continue
+		}
+		imported++
+		details = append(details, fmt.Sprintf("- %s -> %s", file.Name, phone))
+	}
+
+	lines := []string{
+		fmt.Sprintf("Session 导入完成，共 %d 个文件。", len(files)),
+		fmt.Sprintf("成功: %d", imported),
+		fmt.Sprintf("失败: %d", failed),
+	}
+	if len(details) > 0 {
+		limit := len(details)
+		if limit > 8 {
+			limit = 8
+		}
+		lines = append(lines, "", strings.Join(details[:limit], "\n"))
+		if len(details) > limit {
+			lines = append(lines, fmt.Sprintf("… 另外还有 %d 条结果未展开", len(details)-limit))
+		}
+	}
+	return strings.Join(lines, "\n"), nil
+}
+
 func (a *App) DMCounts() (active int, total int) {
 	accounts := a.dmStore.List()
 
@@ -370,6 +413,88 @@ func (a *App) GetDMAccount(phone string) (service.DMAccountInfo, bool) {
 		}
 	}
 	return service.DMAccountInfo{}, false
+}
+
+func (a *App) importSingleDMSession(ctx, runCtx context.Context, file tg.ImportedSessionFile) (string, error) {
+	tmpDir, err := os.MkdirTemp("", "jtbot-dm-import-*")
+	if err != nil {
+		return "", fmt.Errorf("create temp dir: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	sqlitePath := filepath.Join(tmpDir, filepath.Base(file.Name))
+	if err := os.WriteFile(sqlitePath, file.Data, 0o600); err != nil {
+		return "", fmt.Errorf("write temp session: %w", err)
+	}
+
+	tmpSessionPath := filepath.Join(tmpDir, "imported.json")
+	if err := tg.ConvertTelethonSQLiteSessionFile(ctx, sqlitePath, tmpSessionPath); err != nil {
+		return "", err
+	}
+
+	probeCtx, cancel := context.WithTimeout(ctx, 25*time.Second)
+	defer cancel()
+
+	probeClient := tg.NewClientWithAuth(a.cfg.AppID, a.cfg.AppHash, "", tmpSessionPath, nil, a.logger)
+	self, err := probeClient.ProbeSession(probeCtx)
+	if err != nil {
+		return "", err
+	}
+
+	phone := strings.TrimSpace(self.Phone)
+	if phone == "" {
+		phone = a.extractPhoneFromImportedSessionName(file.Name)
+	}
+	if strings.TrimSpace(phone) == "" {
+		phone = fmt.Sprintf("user_%d", self.ID)
+	}
+
+	account, added, err := a.dmStore.Add(phone)
+	if err != nil {
+		return "", err
+	}
+	if account.Phone == "" {
+		return "", errors.New("导入后的私信号标识为空")
+	}
+
+	if err := tg.ConvertTelethonSQLiteSessionFile(ctx, sqlitePath, account.SessionFile); err != nil {
+		return "", err
+	}
+
+	if added {
+		if err := a.startDMAccount(runCtx, account); err != nil {
+			return "", err
+		}
+	} else {
+		if err := a.RestartDMAccount(ctx, account.Phone); err != nil {
+			return "", err
+		}
+	}
+
+	return account.Phone, nil
+}
+
+func (a *App) extractPhoneFromImportedSessionName(name string) string {
+	base := strings.TrimSuffix(filepath.Base(name), filepath.Ext(name))
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return ""
+	}
+
+	hasPlus := strings.Contains(base, "+")
+	var digits strings.Builder
+	for _, r := range base {
+		if r >= '0' && r <= '9' {
+			digits.WriteRune(r)
+		}
+	}
+	if digits.Len() < 6 {
+		return ""
+	}
+	if hasPlus {
+		return "+" + digits.String()
+	}
+	return digits.String()
 }
 
 func (a *App) RestartDMAccount(ctx context.Context, phone string) error {

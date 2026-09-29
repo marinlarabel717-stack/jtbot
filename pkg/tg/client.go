@@ -571,6 +571,7 @@ func mapTelegramUser(user *mtproto.User) *model.User {
 	username, _ := user.GetUsername()
 	firstName, _ := user.GetFirstName()
 	lastName, _ := user.GetLastName()
+	phone, _ := user.GetPhone()
 	langCode, _ := user.GetLangCode()
 
 	return &model.User{
@@ -579,6 +580,7 @@ func mapTelegramUser(user *mtproto.User) *model.User {
 		FirstName:    firstName,
 		LastName:     lastName,
 		Username:     username,
+		Phone:        phone,
 		LanguageCode: langCode,
 		HasAvatar:    user.Photo != nil,
 	}

@@ -328,6 +328,10 @@ func (adminTestDMManager) StartDMLogin(context.Context, string) (string, error) 
 	return "ok", nil
 }
 
+func (adminTestDMManager) ImportDMSessions(context.Context, string, []byte) (string, error) {
+	return "imported", nil
+}
+
 func (adminTestDMManager) DMCounts() (int, int) {
 	return 1, 1
 }
