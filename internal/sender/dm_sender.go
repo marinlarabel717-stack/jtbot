@@ -17,22 +17,24 @@ type DMDispatcher interface {
 }
 
 type Sender struct {
-	client       *tg.Client
-	dispatcher   DMDispatcher
-	recordStore  *storage.RecordStore
-	settings     *storage.SettingsStore
-	logger       *logx.Logger
-	notifyClient *tg.Client
+	client          *tg.Client
+	dispatcher      DMDispatcher
+	recordStore     *storage.RecordStore
+	settings        *storage.SettingsStore
+	logger          *logx.Logger
+	notifyClient    *tg.Client
+	notifyAdminChat int64
 }
 
-func New(client *tg.Client, dispatcher DMDispatcher, recordStore *storage.RecordStore, settings *storage.SettingsStore, logger *logx.Logger, notifyClient *tg.Client) *Sender {
+func New(client *tg.Client, dispatcher DMDispatcher, recordStore *storage.RecordStore, settings *storage.SettingsStore, logger *logx.Logger, notifyClient *tg.Client, notifyAdminChat int64) *Sender {
 	return &Sender{
-		client:       client,
-		dispatcher:   dispatcher,
-		recordStore:  recordStore,
-		settings:     settings,
-		logger:       logger,
-		notifyClient: notifyClient,
+		client:          client,
+		dispatcher:      dispatcher,
+		recordStore:     recordStore,
+		settings:        settings,
+		logger:          logger,
+		notifyClient:    notifyClient,
+		notifyAdminChat: notifyAdminChat,
 	}
 }
 
@@ -115,8 +117,7 @@ func safeValue(value, fallback string) string {
 }
 
 func (s *Sender) notifyDMStatus(ctx context.Context, record model.DMRecord, job model.DMJob) {
-	alertChatID := s.settings.AlertChatID()
-	if alertChatID == 0 {
+	if s.notifyAdminChat == 0 {
 		return
 	}
 
@@ -129,7 +130,7 @@ func (s *Sender) notifyDMStatus(ctx context.Context, record model.DMRecord, job 
 	}
 
 	text := formatDMStatusText(record, job)
-	if err := client.SendMessage(ctx, alertChatID, text, nil); err != nil {
+	if err := client.SendMessage(ctx, s.notifyAdminChat, text, nil); err != nil {
 		s.logger.Errorf("send dm status notification failed: %v", err)
 	}
 }

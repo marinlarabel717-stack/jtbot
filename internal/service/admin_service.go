@@ -32,6 +32,7 @@ const (
 	callbackDMUpload            = "admin:dm:upload"
 	callbackDMList              = "admin:dm:list"
 	callbackDMDetailPrefix      = "admin:dm:detail:"
+	callbackDMCheckPrefix       = "admin:dm:check:"
 	callbackDMRetryPrefix       = "admin:dm:retry:"
 	callbackDMDeletePrefix      = "admin:dm:delete:"
 	callbackDMTemplates         = "admin:dm:templates"
@@ -74,27 +75,29 @@ const (
 type pendingAction string
 
 const (
-	pendingNone            pendingAction = ""
-	pendingLoginMonitor    pendingAction = "login_monitor"
-	pendingLoginDM         pendingAction = "login_dm"
-	pendingUploadDMSess    pendingAction = "upload_dm_session"
-	pendingAddKeywords     pendingAction = "add_keywords"
-	pendingRemoveKeyword   pendingAction = "remove_keywords"
-	pendingSetCooldown     pendingAction = "set_cooldown"
-	pendingSetChatCooldown pendingAction = "set_chat_cooldown"
-	pendingSetTextCooldown pendingAction = "set_text_cooldown"
-	pendingSetTemplate     pendingAction = "set_template"
-	pendingAddDMTemplate   pendingAction = "add_dm_template"
-	pendingRemoveDMTpl     pendingAction = "remove_dm_template"
-	pendingSetMinLength    pendingAction = "set_min_length"
-	pendingSetMaxLength    pendingAction = "set_max_length"
-	pendingSetMinAge       pendingAction = "set_min_age"
-	pendingAddChatIDs      pendingAction = "add_chat_ids"
-	pendingRemoveChatIDs   pendingAction = "remove_chat_ids"
-	pendingUnblockUsers    pendingAction = "unblock_users"
-	pendingUnblockChats    pendingAction = "unblock_chats"
-	pendingExportTime      pendingAction = "export_time"
-	pendingExportKeyword   pendingAction = "export_keyword"
+	pendingNone             pendingAction = ""
+	pendingLoginMonitor     pendingAction = "login_monitor"
+	pendingLoginDM          pendingAction = "login_dm"
+	pendingUploadDMSess     pendingAction = "upload_dm_session"
+	pendingAddKeywords      pendingAction = "add_keywords"
+	pendingAddKeywordsExact pendingAction = "add_keywords_exact"
+	pendingAddKeywordsFuzzy pendingAction = "add_keywords_fuzzy"
+	pendingRemoveKeyword    pendingAction = "remove_keywords"
+	pendingSetCooldown      pendingAction = "set_cooldown"
+	pendingSetChatCooldown  pendingAction = "set_chat_cooldown"
+	pendingSetTextCooldown  pendingAction = "set_text_cooldown"
+	pendingSetTemplate      pendingAction = "set_template"
+	pendingAddDMTemplate    pendingAction = "add_dm_template"
+	pendingRemoveDMTpl      pendingAction = "remove_dm_template"
+	pendingSetMinLength     pendingAction = "set_min_length"
+	pendingSetMaxLength     pendingAction = "set_max_length"
+	pendingSetMinAge        pendingAction = "set_min_age"
+	pendingAddChatIDs       pendingAction = "add_chat_ids"
+	pendingRemoveChatIDs    pendingAction = "remove_chat_ids"
+	pendingUnblockUsers     pendingAction = "unblock_users"
+	pendingUnblockChats     pendingAction = "unblock_chats"
+	pendingExportTime       pendingAction = "export_time"
+	pendingExportKeyword    pendingAction = "export_keyword"
 )
 
 type exportFilterType string
@@ -124,10 +127,22 @@ type MonitorAccountInfo struct {
 }
 
 type DMAccountInfo struct {
-	Phone       string
-	SessionFile string
-	Online      bool
-	LastError   string
+	Phone           string
+	SessionFile     string
+	Online          bool
+	LastError       string
+	TodaySent       int
+	TodaySuccess    int
+	TodayFailed     int
+	StatusSummary   string
+	StatusCheckedAt time.Time
+	CanSendDM       bool
+}
+
+type DMAccountCheckResult struct {
+	Summary   string
+	CanSendDM bool
+	CheckedAt time.Time
 }
 
 type MonitorLoginManager interface {
@@ -146,6 +161,7 @@ type DMPoolManager interface {
 	DMCounts() (active int, total int)
 	ListDMAccounts() []DMAccountInfo
 	GetDMAccount(phone string) (DMAccountInfo, bool)
+	CheckDMAccount(ctx context.Context, phone string) (DMAccountCheckResult, error)
 	RestartDMAccount(ctx context.Context, phone string) error
 	DeleteDMAccount(ctx context.Context, phone string) error
 }
@@ -289,12 +305,16 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 	case callbackKeywords:
 		text, keyboard = s.keywordsText(), s.keywordsKeyboard()
 	case callbackKeywordAdd:
-		s.setPending(callback.From.ID, pendingAddKeywords)
-		text, keyboard = "发送要添加的关键词，多个用 | 或换行分隔。", s.keywordsKeyboard()
-		alert = "等待你发送关键词"
+		s.setPending(callback.From.ID, pendingAddKeywordsFuzzy)
+		text, keyboard = "发送要添加的模糊关键词，多个用 | 或换行分隔。\n\n模糊关键词：一句话里只要包含关键词就命中。", s.keywordsKeyboard()
+		alert = "等待你发送模糊关键词"
+	case callbackKeywordAdd + ":exact":
+		s.setPending(callback.From.ID, pendingAddKeywordsExact)
+		text, keyboard = "发送要添加的精准关键词，多个用 | 或换行分隔。\n\n精准关键词：消息内容必须与关键词完全一致才命中。", s.keywordsKeyboard()
+		alert = "等待你发送精准关键词"
 	case callbackKeywordRemove:
 		s.setPending(callback.From.ID, pendingRemoveKeyword)
-		text, keyboard = "发送要删除的关键词，多个用 | 或换行分隔。", s.keywordsKeyboard()
+		text, keyboard = "发送要删除的关键词，多个用 | 或换行分隔。\n\n支持：\n精准:关键词\n模糊:关键词\n或直接发关键词文本（会删除同名的精准/模糊规则）。", s.keywordsKeyboard()
 		alert = "等待你发送要删除的关键词"
 	case callbackDMPool:
 		text, keyboard = s.dmPoolText(), s.dmPoolKeyboard()
@@ -469,6 +489,14 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 		case strings.HasPrefix(callback.Data, callbackDMDetailPrefix):
 			phone := strings.TrimPrefix(callback.Data, callbackDMDetailPrefix)
 			text, keyboard, err = s.dmAccountDetailText(phone)
+		case strings.HasPrefix(callback.Data, callbackDMCheckPrefix):
+			phone := strings.TrimPrefix(callback.Data, callbackDMCheckPrefix)
+			var result DMAccountCheckResult
+			result, err = s.dmManager.CheckDMAccount(ctx, phone)
+			if err == nil {
+				alert = result.Summary
+				text, keyboard, _ = s.dmAccountDetailText(phone)
+			}
 		case strings.HasPrefix(callback.Data, callbackDMRetryPrefix):
 			phone := strings.TrimPrefix(callback.Data, callbackDMRetryPrefix)
 			err = s.dmManager.RestartDMAccount(ctx, phone)
@@ -493,7 +521,7 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 	}
 
 	if err == nil && text != "" {
-		err = s.client.EditMessageText(ctx, callback.Message.Chat.ID, callback.Message.MessageID, text, keyboard)
+		err = s.editMessageText(ctx, callback.Message.Chat.ID, callback.Message.MessageID, text, keyboard)
 	}
 
 	answerText := alert
@@ -544,12 +572,18 @@ func (s *AdminService) handlePendingInput(ctx context.Context, msg *model.Messag
 			return s.client.SendMessage(ctx, msg.Chat.ID, "启动私信号登录失败: "+err.Error(), s.dmPoolKeyboard())
 		}
 		return s.client.SendMessage(ctx, msg.Chat.ID, result+"\n\n"+s.dmPoolText(), s.dmPoolKeyboard())
-	case pendingAddKeywords:
-		added, err := s.keywordStore.Add(splitInputParts(text))
+	case pendingAddKeywordsExact:
+		added, err := s.keywordStore.AddWithMode("exact", splitInputParts(text))
 		if err != nil {
 			return err
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("已添加 %d 个关键词。\n\n%s", added, s.keywordsText()), s.keywordsKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("已添加 %d 个精准关键词。\n\n%s", added, s.keywordsText()), s.keywordsKeyboard())
+	case pendingAddKeywordsFuzzy, pendingAddKeywords:
+		added, err := s.keywordStore.AddWithMode("fuzzy", splitInputParts(text))
+		if err != nil {
+			return err
+		}
+		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("已添加 %d 个模糊关键词。\n\n%s", added, s.keywordsText()), s.keywordsKeyboard())
 	case pendingRemoveKeyword:
 		removed, err := s.keywordStore.Remove(splitInputParts(text))
 		if err != nil {
@@ -813,11 +847,25 @@ func (s *AdminService) accountDetailText(phone string) (string, *model.InlineKey
 }
 
 func (s *AdminService) keywordsText() string {
-	keywords := s.keywordStore.List()
+	keywords := s.keywordStore.ListEntries()
 	if len(keywords) == 0 {
 		return "📝 关键词列表为空"
 	}
-	return fmt.Sprintf("📝 关键词列表 (%d个)：\n\n%s", len(keywords), strings.Join(keywords, " | "))
+	lines := []string{fmt.Sprintf("📝 关键词列表 (%d个)：", len(keywords)), ""}
+	const previewLimit = 60
+	for i, keyword := range keywords {
+		if i >= previewLimit {
+			lines = append(lines, fmt.Sprintf("…… 还有 %d 个关键词未展开显示", len(keywords)-previewLimit))
+			break
+		}
+		modeLabel := "模糊"
+		if strings.EqualFold(strings.TrimSpace(keyword.Mode), "exact") {
+			modeLabel = "精准"
+		}
+		lines = append(lines, fmt.Sprintf("%d. [%s] %s", i+1, modeLabel, keyword.Text))
+	}
+	lines = append(lines, "", "模糊：一句话里包含关键词就命中", "精准：整句内容必须与关键词完全一致才命中")
+	return strings.Join(lines, "\n")
 }
 
 func (s *AdminService) dmPoolText() string {
@@ -859,7 +907,7 @@ func (s *AdminService) dmAccountsText() string {
 		if account.Online {
 			status = "🟢 在线"
 		}
-		line := fmt.Sprintf("%d. %s %s", i+1, account.Phone, status)
+		line := fmt.Sprintf("%d. %s %s | 今日 %d 条", i+1, account.Phone, status, account.TodaySent)
 		if account.LastError != "" && !account.Online {
 			line += " | " + account.LastError
 		}
@@ -878,18 +926,25 @@ func (s *AdminService) dmAccountDetailText(phone string) (string, *model.InlineK
 	if account.Online {
 		status = "🟢 在线"
 	}
-	text := fmt.Sprintf("💬 私信号详情\n\n手机号: %s\n状态: %s\nSession: %s", account.Phone, status, filepathBase(account.SessionFile))
+	text := fmt.Sprintf("💬 私信号详情\n\n手机号: %s\n状态: %s\nSession: %s\n今日发送: %d 条\n今日成功: %d 条\n今日失败: %d 条", account.Phone, status, filepathBase(account.SessionFile), account.TodaySent, account.TodaySuccess, account.TodayFailed)
 	if strings.TrimSpace(account.LastError) != "" {
 		text += "\n错误: " + account.LastError
+	}
+	if strings.TrimSpace(account.StatusSummary) != "" {
+		text += "\nSpamBot 检测: " + account.StatusSummary
+		if !account.StatusCheckedAt.IsZero() {
+			text += "\n检测时间: " + account.StatusCheckedAt.Format("2006-01-02 15:04:05")
+		}
 	}
 
 	keyboard := &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{
+				{Text: "🔎 检查状态", CallbackData: callbackDMCheckPrefix + account.Phone},
 				{Text: "🔄 重新连接", CallbackData: callbackDMRetryPrefix + account.Phone},
-				{Text: "❌ 删除账号", CallbackData: callbackDMDeletePrefix + account.Phone},
 			},
 			{
+				{Text: "❌ 删除账号", CallbackData: callbackDMDeletePrefix + account.Phone},
 				{Text: "🔙 返回列表", CallbackData: callbackDMList},
 			},
 		},
@@ -948,9 +1003,9 @@ func (s *AdminService) dmRecordsText() string {
 func (s *AdminService) dmSettingsText() string {
 	state := s.settings.Snapshot()
 	return fmt.Sprintf(
-		"⚙️ 私信发送设置\n\n冷却时间: %d 分钟\nDry-run: %t\n当前默认模板:\n%s",
+		"⚙️ 私信发送设置\n\n冷却时间: %d 分钟\n发送模式: %s\n当前默认模板:\n%s",
 		state.CooldownMinutes,
-		state.DryRun,
+		dryRunLabel(state.DryRun),
 		state.DMTemplate,
 	)
 }
@@ -979,10 +1034,10 @@ func (s *AdminService) legacyRulesText() string {
 		alertChat = strconv.FormatInt(state.AlertChatID, 10)
 	}
 	return fmt.Sprintf(
-		"⚙️ 过滤设置\n\n监控开关: %s\n冷却时间: %d 分钟\nDry-run: %t\n通知群: %s\n最大消息长度: %s\n过滤无用户名: %s\n过滤无头像: %s\n最小账号年龄: %s 天\n私信模板:\n%s",
+		"⚙️ 过滤设置\n\n监控开关: %s\n冷却时间: %d 分钟\n发送模式: %s\n通知群: %s\n最大消息长度: %s\n过滤无用户名: %s\n过滤无头像: %s\n最小账号年龄: %s 天\n私信模板:\n%s",
 		onOff(state.MonitoringEnabled),
 		state.CooldownMinutes,
-		state.DryRun,
+		dryRunLabel(state.DryRun),
 		alertChat,
 		formatOptionalNumber(state.MaxMessageLength, "不限"),
 		onOff(state.FilterNoUsername),
@@ -999,12 +1054,12 @@ func (s *AdminService) rulesText() string {
 		alertChat = strconv.FormatInt(state.AlertChatID, 10)
 	}
 	return fmt.Sprintf(
-		"⚙️ 过滤设置\n\n监控开关: %s\n同用户重复私信冷却: %d 分钟\n同群重复私信冷却: %s 分钟\n同内容重复私信冷却: %s 分钟\nDry-run: %t\n通知群: %s\n最小消息长度: %s\n最大消息长度: %s\n过滤无用户名: %s\n过滤无头像: %s\n最小账号年龄: %s 天\n私信模板:\n%s",
+		"⚙️ 过滤设置\n\n监控开关: %s\n同用户重复私信冷却: %d 分钟\n同群重复私信冷却: %s 分钟\n同内容重复私信冷却: %s 分钟\n发送模式: %s\n通知群: %s\n最小消息长度: %s\n最大消息长度: %s\n过滤无用户名: %s\n过滤无头像: %s\n最小账号年龄: %s 天\n私信模板:\n%s",
 		onOff(state.MonitoringEnabled),
 		state.CooldownMinutes,
 		formatOptionalNumber(state.ChatCooldownMinutes, "关闭"),
 		formatOptionalNumber(state.TextCooldownMinutes, "关闭"),
-		state.DryRun,
+		dryRunLabel(state.DryRun),
 		alertChat,
 		formatOptionalNumber(state.MinMessageLength, "不限制"),
 		formatOptionalNumber(state.MaxMessageLength, "不限制"),
@@ -1072,7 +1127,7 @@ func (s *AdminService) statusText() string {
 	matchRecords := s.recordStore.MatchRecords()
 	todaySent, todaySuccess, todayFailed := s.dmStatsToday()
 	return fmt.Sprintf(
-		"📊 运行状态\n\n监控账号: %d在线 / %d离线\n关键词: %d个\n命中记录: %d\n私信记录: 发送 %d | 成功 %d | 失败 %d\n过滤开关: %s\nDry-run: %t",
+		"📊 运行状态\n\n监控账号: %d在线 / %d离线\n关键词: %d个\n命中记录: %d\n私信记录: 发送 %d | 成功 %d | 失败 %d\n过滤开关: %s\n发送模式: %s",
 		active,
 		total-active,
 		len(s.keywordStore.List()),
@@ -1081,7 +1136,7 @@ func (s *AdminService) statusText() string {
 		todaySuccess,
 		todayFailed,
 		onOff(s.settings.IsMonitoringEnabled()),
-		s.settings.IsDryRun(),
+		dryRunLabel(s.settings.IsDryRun()),
 	)
 }
 
@@ -1148,7 +1203,10 @@ func (s *AdminService) keywordsKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
 			{
-				{Text: "➕ 添加关键词", CallbackData: callbackKeywordAdd},
+				{Text: "➕ 模糊关键词", CallbackData: callbackKeywordAdd},
+				{Text: "🎯 精准关键词", CallbackData: callbackKeywordAdd + ":exact"},
+			},
+			{
 				{Text: "➖ 删除关键词", CallbackData: callbackKeywordRemove},
 			},
 			{
@@ -1649,6 +1707,42 @@ func formatOptionalNumber(value int, disabled string) string {
 		return disabled
 	}
 	return strconv.Itoa(value)
+}
+
+func dryRunLabel(enabled bool) string {
+	if enabled {
+		return "演练模式（不真实私信）"
+	}
+	return "真实发送"
+}
+
+func (s *AdminService) editMessageText(ctx context.Context, chatID int64, messageID int64, text string, keyboard *model.InlineKeyboardMarkup) error {
+	text = trimTelegramText(text, 3500)
+	err := s.client.EditMessageText(ctx, chatID, messageID, text, keyboard)
+	if err == nil {
+		return nil
+	}
+
+	lower := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(lower, "message is not modified"):
+		return nil
+	case strings.Contains(lower, "message_too_long"), strings.Contains(lower, "message is too long"):
+		return s.client.EditMessageText(ctx, chatID, messageID, trimTelegramText(text, 3000), keyboard)
+	default:
+		return err
+	}
+}
+
+func trimTelegramText(text string, limit int) string {
+	runes := []rune(strings.TrimSpace(text))
+	if len(runes) <= limit || limit <= 0 {
+		return string(runes)
+	}
+	if limit <= 20 {
+		return string(runes[:limit])
+	}
+	return string(runes[:limit-12]) + "\n\n…… 内容过长，已截断"
 }
 
 func (s *AdminService) listMonitorAccounts() []MonitorAccountInfo {

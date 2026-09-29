@@ -20,6 +20,12 @@ type RecordStore struct {
 	state recordState
 }
 
+type DMSenderStats struct {
+	Sent    int
+	Success int
+	Failed  int
+}
+
 type recordState struct {
 	MatchRecords []model.MatchRecord  `json:"match_records"`
 	DMRecords    []model.DMRecord     `json:"dm_records"`
@@ -136,6 +142,33 @@ func (s *RecordStore) DMRecords() []model.DMRecord {
 	records := make([]model.DMRecord, len(s.state.DMRecords))
 	copy(records, s.state.DMRecords)
 	return records
+}
+
+func (s *RecordStore) TodaySenderStats() map[string]DMSenderStats {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	today := time.Now().Format("2006-01-02")
+	result := make(map[string]DMSenderStats)
+	for _, record := range s.state.DMRecords {
+		if record.SentAt.Format("2006-01-02") != today {
+			continue
+		}
+		label := strings.TrimSpace(record.Sender)
+		if label == "" {
+			label = "unknown"
+		}
+		stats := result[label]
+		stats.Sent++
+		switch record.Status {
+		case "sent", "success":
+			stats.Success++
+		case "failed":
+			stats.Failed++
+		}
+		result[label] = stats
+	}
+	return result
 }
 
 func (s *RecordStore) load() error {

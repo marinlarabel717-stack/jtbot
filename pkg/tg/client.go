@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/auth"
@@ -204,6 +205,48 @@ func (c *Client) SendDirectMessage(ctx context.Context, userID int64, username, 
 		return err
 	}
 	return c.sendText(ctx, peer, text)
+}
+
+func (c *Client) CheckSpamBotStatus(ctx context.Context) (string, bool, error) {
+	if c.baseURL != "" {
+		return "", false, errors.New("Bot API 模式不支持 SpamBot 检查")
+	}
+
+	peer, err := c.resolveUsernamePeer(ctx, "SpamBot")
+	if err != nil {
+		return "", false, fmt.Errorf("无法定位 @SpamBot：%w", err)
+	}
+	if err := c.sendText(ctx, peer, "/start"); err != nil {
+		return "", false, fmt.Errorf("无法向 @SpamBot 发起检测：%w", err)
+	}
+
+	select {
+	case <-ctx.Done():
+		return "", false, ctx.Err()
+	case <-time.After(2 * time.Second):
+	}
+
+	c.mu.RLock()
+	api := c.api
+	c.mu.RUnlock()
+	if api == nil {
+		return "", false, errors.New("telegram api is not ready")
+	}
+
+	history, err := api.MessagesGetHistory(ctx, &mtproto.MessagesGetHistoryRequest{
+		Peer:  peer,
+		Limit: 5,
+	})
+	if err != nil {
+		return "", false, fmt.Errorf("读取 @SpamBot 回复失败：%w", err)
+	}
+
+	raw := latestIncomingText(history)
+	if strings.TrimSpace(raw) == "" {
+		return "未拿到 @SpamBot 的有效回复，请稍后再试", false, nil
+	}
+
+	return interpretSpamBotText(raw), spamBotCanSend(raw), nil
 }
 
 func (c *Client) EditMessageText(ctx context.Context, chatID int64, messageID int64, text string, replyMarkup *model.InlineKeyboardMarkup) error {
@@ -561,6 +604,76 @@ func (c *Client) sendText(ctx context.Context, peer mtproto.InputPeerClass, text
 		RandomID: randomID,
 	})
 	return err
+}
+
+func latestIncomingText(history mtproto.MessagesMessagesClass) string {
+	withMessages, ok := any(history).(interface {
+		GetMessages() []mtproto.MessageClass
+	})
+	if !ok {
+		return ""
+	}
+	for _, item := range withMessages.GetMessages() {
+		message, ok := item.(*mtproto.Message)
+		if !ok || message == nil || message.Out {
+			continue
+		}
+		if text := strings.TrimSpace(message.Message); text != "" {
+			return text
+		}
+	}
+	return ""
+}
+
+func interpretSpamBotText(raw string) string {
+	text := normalizeSpamBotText(raw)
+
+	switch {
+	case containsAny(text, "some phone numbers may trigger a harsh response", "phone numbers may trigger"):
+		return "账号可正常私信，但当前地区号段可能更容易触发风控"
+	case containsAny(text, "good news, no limits are currently applied", "you're free as a bird", "no limits", "free as a bird", "no restrictions", "all good", "account is free", "not limited"):
+		return "账号状态正常，目前没有私信限制"
+	case containsAny(text, "account is now limited until", "limited until", "moderators have confirmed the report", "users found your messages annoying", "will be automatically released", "temporarily limited"):
+		return "账号被临时限制，暂时不能正常私信"
+	case containsAny(text, "actions can trigger a harsh response from our anti-spam systems", "account was limited", "you will not be able to send messages"):
+		return "账号触发了垃圾消息风控，当前不适合继续私信"
+	case containsAny(text, "permanently banned", "account has been frozen permanently", "permanently restricted", "banned permanently", "blocked for violations", "terms of service", "banned", "suspended"):
+		return "账号已被永久限制或封禁，不能再用于私信"
+	case containsAny(text, "wait", "pending", "verification"):
+		return "账号处于等待验证或审核状态，暂时不能稳定私信"
+	default:
+		return "未能明确识别账号状态，请人工查看 @SpamBot 最新回复"
+	}
+}
+
+func spamBotCanSend(raw string) bool {
+	text := normalizeSpamBotText(raw)
+	if containsAny(text, "some phone numbers may trigger a harsh response", "phone numbers may trigger") {
+		return true
+	}
+	return containsAny(text, "good news, no limits are currently applied", "you're free as a bird", "no limits", "free as a bird", "no restrictions", "all good", "account is free", "not limited")
+}
+
+func normalizeSpamBotText(text string) string {
+	replacer := strings.NewReplacer(
+		"正常", "all good",
+		"没有限制", "no limits",
+		"无限制", "no limits",
+		"永久封禁", "permanently banned",
+		"限制", "limited",
+		"暂时", "temporarily",
+		"验证", "verification",
+	)
+	return strings.ToLower(replacer.Replace(strings.TrimSpace(text)))
+}
+
+func containsAny(text string, patterns ...string) bool {
+	for _, pattern := range patterns {
+		if strings.Contains(text, strings.ToLower(pattern)) {
+			return true
+		}
+	}
+	return false
 }
 
 func mapTelegramUser(user *mtproto.User) *model.User {

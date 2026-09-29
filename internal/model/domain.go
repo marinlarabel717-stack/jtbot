@@ -126,6 +126,11 @@ type Document struct {
 	FileSize int64  `json:"file_size"`
 }
 
+type KeywordRule struct {
+	Text string `json:"text"`
+	Mode string `json:"mode,omitempty"`
+}
+
 type MatchRecord struct {
 	UserID    int64     `json:"user_id"`
 	Username  string    `json:"username"`

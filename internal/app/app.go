@@ -29,6 +29,9 @@ type monitorRuntime struct {
 	sessionFile string
 	online      bool
 	lastError   string
+	statusNote  string
+	checkedAt   time.Time
+	canSendDM   bool
 }
 
 type App struct {
@@ -49,12 +52,13 @@ type App struct {
 
 	authCoordinator *tg.AuthCoordinator
 
-	runMu      sync.RWMutex
-	runCtx     context.Context
-	monitors   map[string]*monitorRuntime
-	dmAccounts map[string]*monitorRuntime
-	dmIndex    int
-	wg         sync.WaitGroup
+	runMu       sync.RWMutex
+	runCtx      context.Context
+	monitors    map[string]*monitorRuntime
+	dmAccounts  map[string]*monitorRuntime
+	dmIndex     int
+	lastDMAlert time.Time
+	wg          sync.WaitGroup
 }
 
 func New() (*App, error) {
@@ -391,6 +395,7 @@ func (a *App) DMCounts() (active int, total int) {
 func (a *App) ListDMAccounts() []service.DMAccountInfo {
 	accounts := a.dmStore.List()
 	result := make([]service.DMAccountInfo, 0, len(accounts))
+	todayStats := a.recordStore.TodaySenderStats()
 
 	a.runMu.RLock()
 	defer a.runMu.RUnlock()
@@ -403,6 +408,14 @@ func (a *App) ListDMAccounts() []service.DMAccountInfo {
 		if runtime, ok := a.dmAccounts[account.Phone]; ok && runtime != nil {
 			info.Online = runtime.online
 			info.LastError = runtime.lastError
+			info.StatusSummary = runtime.statusNote
+			info.StatusCheckedAt = runtime.checkedAt
+			info.CanSendDM = runtime.canSendDM
+		}
+		if stats, ok := todayStats[account.Phone]; ok {
+			info.TodaySent = stats.Sent
+			info.TodaySuccess = stats.Success
+			info.TodayFailed = stats.Failed
 		}
 		result = append(result, info)
 	}
@@ -416,6 +429,43 @@ func (a *App) GetDMAccount(phone string) (service.DMAccountInfo, bool) {
 		}
 	}
 	return service.DMAccountInfo{}, false
+}
+
+func (a *App) CheckDMAccount(ctx context.Context, phone string) (service.DMAccountCheckResult, error) {
+	phone = strings.TrimSpace(phone)
+	if phone == "" {
+		return service.DMAccountCheckResult{}, errors.New("私信号不能为空")
+	}
+
+	a.runMu.RLock()
+	runtime := a.dmAccounts[phone]
+	a.runMu.RUnlock()
+	if runtime == nil || runtime.client == nil || !runtime.online {
+		return service.DMAccountCheckResult{}, errors.New("私信号当前离线，请先重新连接后再检查")
+	}
+
+	checkCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	summary, canSend, err := runtime.client.CheckSpamBotStatus(checkCtx)
+	if err != nil {
+		return service.DMAccountCheckResult{}, err
+	}
+
+	now := time.Now()
+	a.runMu.Lock()
+	if current := a.dmAccounts[phone]; current != nil {
+		current.statusNote = summary
+		current.checkedAt = now
+		current.canSendDM = canSend
+	}
+	a.runMu.Unlock()
+
+	return service.DMAccountCheckResult{
+		Summary:   summary,
+		CanSendDM: canSend,
+		CheckedAt: now,
+	}, nil
 }
 
 func (a *App) importSingleDMSession(ctx, runCtx context.Context, file tg.ImportedSessionFile) (string, error) {
@@ -640,7 +690,7 @@ func (a *App) startMonitorAccount(ctx context.Context, account storage.MonitorAc
 	a.runMu.Unlock()
 
 	jobQueue := queue.NewMessageQueue(a.cfg.QueueSize)
-	dmSender := sender.New(client, a, a.recordStore, a.settings, a.logger, a.adminBot)
+	dmSender := sender.New(client, a, a.recordStore, a.settings, a.logger, a.adminBot, a.cfg.AdminUserID)
 	triggerSvc := service.NewTriggerService(
 		a.matcher,
 		a.keywordStore,
@@ -851,25 +901,43 @@ func (a *App) SendDM(ctx context.Context, _ *tg.Client, job model.DMJob, text st
 		}
 	}
 
-	var selectedPhone string
-	var selectedClient *tg.Client
+	ordered := make([]string, 0, len(available))
 	if len(available) > 0 {
-		selectedPhone = available[a.dmIndex%len(available)]
-		a.dmIndex = (a.dmIndex + 1) % len(available)
-		if runtime := a.dmAccounts[selectedPhone]; runtime != nil {
-			selectedClient = runtime.client
+		start := a.dmIndex % len(available)
+		for i := 0; i < len(available); i++ {
+			ordered = append(ordered, available[(start+i)%len(available)])
 		}
+		a.dmIndex = (a.dmIndex + 1) % len(available)
 	}
 	a.runMu.Unlock()
 
-	if selectedPhone != "" && selectedClient != nil {
-		if err := selectedClient.SendDirectMessage(ctx, job.TargetUserID, job.Username, text); err == nil {
-			return selectedPhone, nil
-		}
-		return selectedPhone, fmt.Errorf("私信号 %s 发送失败", selectedPhone)
+	if len(ordered) == 0 {
+		a.alertDMUnavailable(ctx, "当前没有可用的在线私信号，请及时补充新号或重新连接现有私信号。")
+		return "", errors.New("没有可用的私信发送账号，请先在私信号池添加或上传私信号")
 	}
 
-	return "", errors.New("没有可用的私信发送账号，请先在私信号池添加或上传私信号")
+	var lastErr error
+	for _, phone := range ordered {
+		a.runMu.RLock()
+		runtime := a.dmAccounts[phone]
+		a.runMu.RUnlock()
+		if runtime == nil || runtime.client == nil {
+			continue
+		}
+		if err := runtime.client.SendDirectMessage(ctx, job.TargetUserID, job.Username, text); err == nil {
+			a.clearDMAccountSendError(phone)
+			return phone, nil
+		} else {
+			lastErr = fmt.Errorf("私信号 %s 发送失败：%w", phone, err)
+			a.rememberDMAccountSendError(phone, lastErr.Error())
+		}
+	}
+
+	if lastErr == nil {
+		lastErr = errors.New("所有在线私信号都发送失败")
+	}
+	a.alertDMUnavailable(ctx, fmt.Sprintf("当前在线私信号共 %d 个，但全部发送失败，请及时补充新号或检查风控。\n最后失败原因：%s", len(ordered), lastErr.Error()))
+	return "", lastErr
 }
 
 func (a *App) notifyAdmin(ctx context.Context, text string) {
@@ -880,6 +948,33 @@ func (a *App) notifyAdmin(ctx context.Context, text string) {
 	defer cancel()
 	if err := a.adminBot.SendMessage(sendCtx, a.cfg.AdminUserID, text, nil); err != nil {
 		a.logger.Errorf("notify admin failed: %v", err)
+	}
+}
+
+func (a *App) alertDMUnavailable(ctx context.Context, detail string) {
+	a.runMu.Lock()
+	if time.Since(a.lastDMAlert) < 10*time.Minute {
+		a.runMu.Unlock()
+		return
+	}
+	a.lastDMAlert = time.Now()
+	a.runMu.Unlock()
+	a.notifyAdmin(ctx, "⚠️ 私信号池告警\n\n"+strings.TrimSpace(detail))
+}
+
+func (a *App) rememberDMAccountSendError(phone, message string) {
+	a.runMu.Lock()
+	defer a.runMu.Unlock()
+	if runtime := a.dmAccounts[phone]; runtime != nil {
+		runtime.lastError = strings.TrimSpace(message)
+	}
+}
+
+func (a *App) clearDMAccountSendError(phone string) {
+	a.runMu.Lock()
+	defer a.runMu.Unlock()
+	if runtime := a.dmAccounts[phone]; runtime != nil {
+		runtime.lastError = ""
 	}
 }
 

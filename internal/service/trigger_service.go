@@ -101,7 +101,7 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 		return nil
 	}
 
-	keywords := s.matcher.Match(content, s.keywordStore.List())
+	keywords := s.matcher.Match(content, s.keywordStore.ListEntries())
 	if len(keywords) == 0 {
 		return nil
 	}

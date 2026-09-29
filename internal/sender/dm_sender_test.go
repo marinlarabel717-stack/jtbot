@@ -40,7 +40,7 @@ func TestSenderNotifiesSuccess(t *testing.T) {
 	defer server.Close()
 
 	recordStore, settingsStore := newSenderTestStores(t, 999)
-	s := New(nil, stubDispatcher{label: "+15550001"}, recordStore, settingsStore, logx.New("debug"), tg.NewClientWithBaseURL(server.URL))
+	s := New(nil, stubDispatcher{label: "+15550001"}, recordStore, settingsStore, logx.New("debug"), tg.NewClientWithBaseURL(server.URL), 999)
 
 	s.handleJob(context.Background(), model.DMJob{
 		TargetUserID: 2019667492,
@@ -81,7 +81,7 @@ func TestSenderNotifiesFailureInChinese(t *testing.T) {
 	defer server.Close()
 
 	recordStore, settingsStore := newSenderTestStores(t, 999)
-	s := New(nil, stubDispatcher{label: "+15550002", err: context.DeadlineExceeded}, recordStore, settingsStore, logx.New("debug"), tg.NewClientWithBaseURL(server.URL))
+	s := New(nil, stubDispatcher{label: "+15550002", err: context.DeadlineExceeded}, recordStore, settingsStore, logx.New("debug"), tg.NewClientWithBaseURL(server.URL), 999)
 
 	s.handleJob(context.Background(), model.DMJob{
 		TargetUserID: 123456,

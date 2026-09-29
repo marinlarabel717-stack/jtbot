@@ -344,6 +344,10 @@ func (adminTestDMManager) GetDMAccount(phone string) (DMAccountInfo, bool) {
 	return DMAccountInfo{Phone: phone, Online: true, SessionFile: "dm.json"}, true
 }
 
+func (adminTestDMManager) CheckDMAccount(context.Context, string) (DMAccountCheckResult, error) {
+	return DMAccountCheckResult{Summary: "账号状态正常，目前没有私信限制"}, nil
+}
+
 func (adminTestDMManager) RestartDMAccount(context.Context, string) error {
 	return nil
 }
