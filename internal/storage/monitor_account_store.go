@@ -44,6 +44,23 @@ func (s *MonitorAccountStore) List() []MonitorAccount {
 	return result
 }
 
+func (s *MonitorAccountStore) Get(phone string) (MonitorAccount, bool) {
+	normalized := normalizePhone(phone)
+	if normalized == "" {
+		return MonitorAccount{}, false
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, account := range s.accounts {
+		if account.Phone == normalized {
+			return account, true
+		}
+	}
+	return MonitorAccount{}, false
+}
+
 func (s *MonitorAccountStore) Add(phone string) (MonitorAccount, bool, error) {
 	normalized := normalizePhone(phone)
 	if normalized == "" {
@@ -71,6 +88,29 @@ func (s *MonitorAccountStore) Add(phone string) (MonitorAccount, bool, error) {
 		return MonitorAccount{}, false, err
 	}
 	return account, true, nil
+}
+
+func (s *MonitorAccountStore) Remove(phone string) (MonitorAccount, bool, error) {
+	normalized := normalizePhone(phone)
+	if normalized == "" {
+		return MonitorAccount{}, false, nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i, account := range s.accounts {
+		if account.Phone != normalized {
+			continue
+		}
+
+		s.accounts = append(s.accounts[:i], s.accounts[i+1:]...)
+		if err := s.persistLocked(); err != nil {
+			return MonitorAccount{}, false, err
+		}
+		return account, true, nil
+	}
+	return MonitorAccount{}, false, nil
 }
 
 func (s *MonitorAccountStore) load() error {

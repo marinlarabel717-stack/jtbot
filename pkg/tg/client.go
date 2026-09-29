@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -228,6 +229,67 @@ func (c *Client) AnswerCallbackQuery(ctx context.Context, callbackQueryID, text 
 		return nil
 	}
 	return errors.New("callback queries are not supported in user-session mode")
+}
+
+func (c *Client) SendDocument(ctx context.Context, chatID int64, filename string, data []byte, caption string) error {
+	if c.baseURL == "" {
+		return errors.New("sendDocument is only supported in bot api mode")
+	}
+	if c.httpClient == nil {
+		c.httpClient = &http.Client{}
+	}
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+
+	if err := writer.WriteField("chat_id", strconv.FormatInt(chatID, 10)); err != nil {
+		return err
+	}
+	if strings.TrimSpace(caption) != "" {
+		if err := writer.WriteField("caption", caption); err != nil {
+			return err
+		}
+	}
+
+	part, err := writer.CreateFormFile("document", filename)
+	if err != nil {
+		return err
+	}
+	if _, err := part.Write(data); err != nil {
+		return err
+	}
+	if err := writer.Close(); err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"sendDocument", &body)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	respData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode >= http.StatusBadRequest {
+		return fmt.Errorf("compat http %d: %s", resp.StatusCode, string(respData))
+	}
+
+	var response apiResponse[map[string]any]
+	if err := json.Unmarshal(respData, &response); err != nil {
+		return err
+	}
+	if !response.OK {
+		return fmt.Errorf("compat sendDocument failed: %s", response.Description)
+	}
+	return nil
 }
 
 func (c *Client) handleIncomingMessage(

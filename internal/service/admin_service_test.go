@@ -215,6 +215,7 @@ type adminTestCalls struct {
 	send   int
 	edit   int
 	answer int
+	doc    int
 }
 
 func newAdminTestClient(t *testing.T) (*tg.Client, *adminTestCalls) {
@@ -226,6 +227,9 @@ func newAdminTestClient(t *testing.T) (*tg.Client, *adminTestCalls) {
 		case "/sendMessage":
 			calls.send++
 			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "result": map[string]any{"message_id": 1}})
+		case "/sendDocument":
+			calls.doc++
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "result": map[string]any{"message_id": 2}})
 		case "/editMessageText":
 			calls.edit++
 			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "result": map[string]any{}})
@@ -274,12 +278,17 @@ func newAdminTestServiceWithAuth(t *testing.T, client *tg.Client, authInput *tg.
 		t.Fatalf("new blacklist: %v", err)
 	}
 
+	recordStore, err := storage.NewRecordStore(filepath.Join(tmpDir, "records.json"))
+	if err != nil {
+		t.Fatalf("new records: %v", err)
+	}
+
 	var submitter AuthSubmitter
 	if authInput != nil {
 		submitter = authInput
 	}
 
-	admin := NewAdminService(123, client, keywordStore, settingsStore, blacklistStore, submitter, adminTestMonitorManager{}, logx.New("debug"))
+	admin := NewAdminService(123, client, keywordStore, settingsStore, blacklistStore, submitter, adminTestMonitorManager{}, recordStore, logx.New("debug"))
 	return admin, settingsStore, blacklistStore
 }
 
@@ -295,4 +304,20 @@ func (adminTestMonitorManager) MonitorSummary() string {
 
 func (adminTestMonitorManager) MonitorCounts() (int, int) {
 	return 1, 1
+}
+
+func (adminTestMonitorManager) ListMonitorAccounts() []MonitorAccountInfo {
+	return []MonitorAccountInfo{{Phone: "+123456", Online: true}}
+}
+
+func (adminTestMonitorManager) GetMonitorAccount(phone string) (MonitorAccountInfo, bool) {
+	return MonitorAccountInfo{Phone: phone, Online: true, SessionFile: "session.json"}, true
+}
+
+func (adminTestMonitorManager) RestartMonitor(context.Context, string) error {
+	return nil
+}
+
+func (adminTestMonitorManager) DeleteMonitor(context.Context, string) error {
+	return nil
 }

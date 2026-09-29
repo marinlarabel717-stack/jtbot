@@ -1,11 +1,15 @@
 package service
 
 import (
+	"bytes"
 	"context"
+	"encoding/csv"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/marinlarabel717-stack/jtbot/internal/logx"
 	"github.com/marinlarabel717-stack/jtbot/internal/model"
@@ -13,34 +17,43 @@ import (
 )
 
 const (
-	callbackMain          = "admin:main"
-	callbackAccounts      = "admin:accounts"
-	callbackAccountLogin  = "admin:account:login"
-	callbackKeywords      = "admin:keywords"
-	callbackKeywordAdd    = "admin:keyword:add"
-	callbackKeywordRemove = "admin:keyword:remove"
-	callbackFilters       = "admin:filters"
-	callbackRules         = "admin:rules"
-	callbackToggleMonitor = "admin:rule:toggle_monitor"
-	callbackToggleDryRun  = "admin:rule:toggle_dryrun"
-	callbackSetCooldown   = "admin:rule:set_cooldown"
-	callbackSetTemplate   = "admin:rule:set_template"
-	callbackSetMaxLength  = "admin:rule:set_max_length"
-	callbackSetMinAge     = "admin:rule:set_min_age"
-	callbackToggleNoName  = "admin:rule:toggle_no_username"
-	callbackToggleNoPhoto = "admin:rule:toggle_no_avatar"
-	callbackChats         = "admin:chats"
-	callbackAddChat       = "admin:chat:add"
-	callbackRemoveChat    = "admin:chat:remove"
-	callbackSetAlertChat  = "admin:alert:set_current"
-	callbackBlacklist     = "admin:blacklist"
-	callbackUnblockUser   = "admin:blacklist:user:remove"
-	callbackUnblockChat   = "admin:blacklist:chat:remove"
-	callbackBlockUser     = "admin:blacklist:user:"
-	callbackBlockChat     = "admin:blacklist:chat:"
-	callbackExport        = "admin:export"
-	callbackStatus        = "admin:status"
-	callbackHelp          = "admin:help"
+	callbackMain                = "admin:main"
+	callbackAccounts            = "admin:accounts"
+	callbackAccountAdd          = "admin:account:add"
+	callbackAccountList         = "admin:account:list"
+	callbackAccountDetailPrefix = "admin:account:detail:"
+	callbackAccountRetryPrefix  = "admin:account:retry:"
+	callbackAccountDeletePrefix = "admin:account:delete:"
+	callbackKeywords            = "admin:keywords"
+	callbackKeywordAdd          = "admin:keyword:add"
+	callbackKeywordRemove       = "admin:keyword:remove"
+	callbackDMPool              = "admin:dm_pool"
+	callbackExport              = "admin:export"
+	callbackExportByTime        = "admin:export:time"
+	callbackExportByKeyword     = "admin:export:keyword"
+	callbackExportAll           = "admin:export:all"
+	callbackExportFormatUsers   = "admin:export:format:users"
+	callbackExportFormatIDs     = "admin:export:format:ids"
+	callbackExportFormatCSV     = "admin:export:format:csv"
+	callbackFilters             = "admin:filters"
+	callbackToggleMonitor       = "admin:rule:toggle_monitor"
+	callbackToggleDryRun        = "admin:rule:toggle_dryrun"
+	callbackSetCooldown         = "admin:rule:set_cooldown"
+	callbackSetTemplate         = "admin:rule:set_template"
+	callbackSetMaxLength        = "admin:rule:set_max_length"
+	callbackSetMinAge           = "admin:rule:set_min_age"
+	callbackToggleNoName        = "admin:rule:toggle_no_username"
+	callbackToggleNoPhoto       = "admin:rule:toggle_no_avatar"
+	callbackChats               = "admin:chats"
+	callbackAddChat             = "admin:chat:add"
+	callbackRemoveChat          = "admin:chat:remove"
+	callbackSetAlertChat        = "admin:alert:set_current"
+	callbackBlacklist           = "admin:blacklist"
+	callbackUnblockUser         = "admin:blacklist:user:remove"
+	callbackUnblockChat         = "admin:blacklist:chat:remove"
+	callbackBlockUser           = "admin:blacklist:user:"
+	callbackBlockChat           = "admin:blacklist:chat:"
+	callbackStatus              = "admin:status"
 )
 
 type pendingAction string
@@ -58,16 +71,51 @@ const (
 	pendingRemoveChatIDs pendingAction = "remove_chat_ids"
 	pendingUnblockUsers  pendingAction = "unblock_users"
 	pendingUnblockChats  pendingAction = "unblock_chats"
+	pendingExportTime    pendingAction = "export_time"
+	pendingExportKeyword pendingAction = "export_keyword"
 )
+
+type exportFilterType string
+
+const (
+	exportAll     exportFilterType = "all"
+	exportByTime  exportFilterType = "time"
+	exportByWords exportFilterType = "keywords"
+)
+
+type exportContext struct {
+	filterType exportFilterType
+	start      time.Time
+	end        time.Time
+	keywords   []string
+}
 
 type AuthSubmitter interface {
 	Submit(text string) (bool, string)
+}
+
+type MonitorAccountInfo struct {
+	Phone       string
+	SessionFile string
+	Online      bool
+	LastError   string
 }
 
 type MonitorLoginManager interface {
 	StartMonitorLogin(ctx context.Context, phone string) (string, error)
 	MonitorSummary() string
 	MonitorCounts() (active int, total int)
+	ListMonitorAccounts() []MonitorAccountInfo
+	GetMonitorAccount(phone string) (MonitorAccountInfo, bool)
+	RestartMonitor(ctx context.Context, phone string) error
+	DeleteMonitor(ctx context.Context, phone string) error
+}
+
+type messageClient interface {
+	SendMessage(ctx context.Context, chatID int64, text string, replyMarkup *model.InlineKeyboardMarkup) error
+	EditMessageText(ctx context.Context, chatID int64, messageID int64, text string, replyMarkup *model.InlineKeyboardMarkup) error
+	AnswerCallbackQuery(ctx context.Context, callbackQueryID, text string) error
+	SendDocument(ctx context.Context, chatID int64, filename string, data []byte, caption string) error
 }
 
 type AdminService struct {
@@ -78,16 +126,12 @@ type AdminService struct {
 	keywordStore   *storage.KeywordStore
 	settings       *storage.SettingsStore
 	blacklist      *storage.BlacklistStore
+	recordStore    *storage.RecordStore
 	logger         *logx.Logger
 
-	mu      sync.Mutex
-	pending map[int64]pendingAction
-}
-
-type messageClient interface {
-	SendMessage(ctx context.Context, chatID int64, text string, replyMarkup *model.InlineKeyboardMarkup) error
-	EditMessageText(ctx context.Context, chatID int64, messageID int64, text string, replyMarkup *model.InlineKeyboardMarkup) error
-	AnswerCallbackQuery(ctx context.Context, callbackQueryID, text string) error
+	mu        sync.Mutex
+	pending   map[int64]pendingAction
+	exportCtx map[int64]exportContext
 }
 
 func NewAdminService(
@@ -98,6 +142,7 @@ func NewAdminService(
 	blacklist *storage.BlacklistStore,
 	authInput AuthSubmitter,
 	monitorManager MonitorLoginManager,
+	recordStore *storage.RecordStore,
 	logger *logx.Logger,
 ) *AdminService {
 	return &AdminService{
@@ -108,8 +153,10 @@ func NewAdminService(
 		keywordStore:   keywordStore,
 		settings:       settings,
 		blacklist:      blacklist,
+		recordStore:    recordStore,
 		logger:         logger,
 		pending:        make(map[int64]pendingAction),
+		exportCtx:      make(map[int64]exportContext),
 	}
 }
 
@@ -175,11 +222,13 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 	case callbackMain:
 		text, keyboard = s.mainText(), s.mainKeyboard()
 	case callbackAccounts:
-		text, keyboard = s.accountsText(), s.accountsKeyboard()
-	case callbackAccountLogin:
+		text, keyboard = s.accountsOverviewText(), s.accountsMenuKeyboard()
+	case callbackAccountAdd:
 		s.setPending(callback.From.ID, pendingLoginMonitor)
-		text, keyboard = s.accountLoginPrompt(), s.accountsKeyboard()
-		alert = "把手机号直接发给我就行"
+		text, keyboard = s.accountAddPrompt(), s.backToAccountsKeyboard()
+		alert = "把手机号直接发给我"
+	case callbackAccountList:
+		text, keyboard = s.accountsListText(), s.accountsListKeyboard()
 	case callbackKeywords:
 		text, keyboard = s.keywordsText(), s.keywordsKeyboard()
 	case callbackKeywordAdd:
@@ -190,7 +239,26 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 		s.setPending(callback.From.ID, pendingRemoveKeyword)
 		text, keyboard = "发送要删除的关键词，多个用 | 或换行分隔。", s.keywordsKeyboard()
 		alert = "等待你发送要删除的关键词"
-	case callbackFilters, callbackRules:
+	case callbackDMPool:
+		text, keyboard = s.dmPoolText(), s.dmPoolKeyboard()
+	case callbackExport:
+		text, keyboard = s.exportText(), s.exportKeyboard()
+	case callbackExportByTime:
+		s.setPending(callback.From.ID, pendingExportTime)
+		text, keyboard = s.exportTimePrompt(), s.cancelExportKeyboard()
+	case callbackExportByKeyword:
+		s.setPending(callback.From.ID, pendingExportKeyword)
+		text, keyboard = s.exportKeywordPrompt(), s.cancelExportKeyboard()
+	case callbackExportAll:
+		s.setExportContext(callback.From.ID, exportContext{filterType: exportAll})
+		text, keyboard = "已选择导出全部数据，请选择导出格式。", s.exportFormatKeyboard()
+	case callbackExportFormatUsers, callbackExportFormatIDs, callbackExportFormatCSV:
+		err = s.sendExportFile(ctx, callback.Message.Chat.ID, callback.From.ID, callback.Data)
+		alert = "导出文件已发送"
+		if err == nil {
+			text, keyboard = s.exportText(), s.exportKeyboard()
+		}
+	case callbackFilters:
 		text, keyboard = s.rulesText(), s.rulesKeyboard()
 	case callbackToggleMonitor:
 		var enabled bool
@@ -278,14 +346,27 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 		s.setPending(callback.From.ID, pendingUnblockChats)
 		text, keyboard = "发送要移出黑名单的群 ID，多个用 | 或换行分隔。", s.blacklistKeyboard()
 		alert = "等待你发送群 ID"
-	case callbackExport:
-		text, keyboard = s.exportText(), s.exportKeyboard()
 	case callbackStatus:
 		text, keyboard = s.statusText(), s.statusKeyboard()
-	case callbackHelp:
-		text, keyboard = s.helpText(), s.helpKeyboard()
 	default:
 		switch {
+		case strings.HasPrefix(callback.Data, callbackAccountDetailPrefix):
+			phone := strings.TrimPrefix(callback.Data, callbackAccountDetailPrefix)
+			text, keyboard, err = s.accountDetailText(phone)
+		case strings.HasPrefix(callback.Data, callbackAccountRetryPrefix):
+			phone := strings.TrimPrefix(callback.Data, callbackAccountRetryPrefix)
+			err = s.monitorManager.RestartMonitor(ctx, phone)
+			if err == nil {
+				alert = "已重新发起连接"
+				text, keyboard, _ = s.accountDetailText(phone)
+			}
+		case strings.HasPrefix(callback.Data, callbackAccountDeletePrefix):
+			phone := strings.TrimPrefix(callback.Data, callbackAccountDeletePrefix)
+			err = s.monitorManager.DeleteMonitor(ctx, phone)
+			if err == nil {
+				alert = "监控号已删除"
+				text, keyboard = s.accountsListText(), s.accountsListKeyboard()
+			}
 		case strings.HasPrefix(callback.Data, callbackBlockUser):
 			alert, err = s.blockUserCallback(callback.Data)
 		case strings.HasPrefix(callback.Data, callbackBlockChat):
@@ -318,19 +399,19 @@ func (s *AdminService) handlePendingInput(ctx context.Context, msg *model.Messag
 	case pendingLoginMonitor:
 		phones := splitInputParts(text)
 		if len(phones) == 0 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "手机号不能为空。", s.accountsKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "手机号不能为空。", s.backToAccountsKeyboard())
 		}
 		if len(phones) > 1 {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "一次先登录一个监控号。多个监控号就重复点击“登录监控账号”依次添加。", s.accountsKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "一次先登录一个监控号。多个监控号请逐个添加。", s.backToAccountsKeyboard())
 		}
 		if s.monitorManager == nil {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "当前没有可用的监控账号管理器。", s.accountsKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "当前没有可用的监控账号管理器。", s.backToAccountsKeyboard())
 		}
 		result, err := s.monitorManager.StartMonitorLogin(ctx, phones[0])
 		if err != nil {
-			return s.client.SendMessage(ctx, msg.Chat.ID, "启动登录失败: "+err.Error(), s.accountsKeyboard())
+			return s.client.SendMessage(ctx, msg.Chat.ID, "启动登录失败: "+err.Error(), s.backToAccountsKeyboard())
 		}
-		return s.client.SendMessage(ctx, msg.Chat.ID, result+"\n\n"+s.accountsText(), s.accountsKeyboard())
+		return s.client.SendMessage(ctx, msg.Chat.ID, result+"\n\n"+s.accountsOverviewText(), s.accountsMenuKeyboard())
 	case pendingAddKeywords:
 		added, err := s.keywordStore.Add(splitInputParts(text))
 		if err != nil {
@@ -402,8 +483,394 @@ func (s *AdminService) handlePendingInput(ctx context.Context, msg *model.Messag
 			return err
 		}
 		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("已移出 %d 个黑名单群。\n\n%s", removed, s.blacklistText()), s.blacklistKeyboard())
+	case pendingExportTime:
+		start, end, err := parseTimeRange(text)
+		if err != nil {
+			return s.client.SendMessage(ctx, msg.Chat.ID, "时间格式不对。\n示例: 09-28-12:00 | 09-28-18:30", s.cancelExportKeyboard())
+		}
+		s.setExportContext(msg.From.ID, exportContext{
+			filterType: exportByTime,
+			start:      start,
+			end:        end,
+		})
+		return s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf(
+			"已选择时间段：\n%s ~ %s\n\n请选择导出格式。",
+			start.Format("01-02 15:04"),
+			end.Format("01-02 15:04"),
+		), s.exportFormatKeyboard())
+	case pendingExportKeyword:
+		keywords := splitInputParts(text)
+		if len(keywords) == 0 {
+			return s.client.SendMessage(ctx, msg.Chat.ID, "关键词不能为空。", s.cancelExportKeyboard())
+		}
+		s.setExportContext(msg.From.ID, exportContext{
+			filterType: exportByWords,
+			keywords:   keywords,
+		})
+		return s.client.SendMessage(ctx, msg.Chat.ID, "已选择关键词："+strings.Join(keywords, ", ")+"\n\n请选择导出格式。", s.exportFormatKeyboard())
 	default:
 		return nil
+	}
+}
+
+func (s *AdminService) mainText() string {
+	active, total := 0, 0
+	if s.monitorManager != nil {
+		active, total = s.monitorManager.MonitorCounts()
+	}
+
+	todaySent, todaySuccess, todayFailed := s.dmStatsToday()
+	return fmt.Sprintf(
+		"🤖 JTBot 关键词监控机器人\n\n📱 监控账号: %d在线 / %d离线\n🔑 关键词: %d个\n💬 私信记录: 发送 %d | 成功 %d | 失败 %d",
+		active,
+		total-active,
+		len(s.keywordStore.List()),
+		todaySent,
+		todaySuccess,
+		todayFailed,
+	)
+}
+
+func (s *AdminService) accountsOverviewText() string {
+	accounts := s.listMonitorAccounts()
+	active, total := 0, len(accounts)
+	for _, account := range accounts {
+		if account.Online {
+			active++
+		}
+	}
+	return fmt.Sprintf("📱 监控账号管理\n\n已登录账号: %d\n在线: %d | 离线: %d", total, active, total-active)
+}
+
+func (s *AdminService) accountAddPrompt() string {
+	return "请输入监控账号的手机号。\n\n支持格式：\n• +8613800138000\n• 8613800138000\n• +66955305284"
+}
+
+func (s *AdminService) accountsListText() string {
+	accounts := s.listMonitorAccounts()
+	if len(accounts) == 0 {
+		return "❌ 暂无监控账号\n\n点击“添加新账号”开始添加。"
+	}
+
+	lines := []string{fmt.Sprintf("📋 账号列表 (%d个)：", len(accounts)), ""}
+	for i, account := range accounts {
+		status := "🔴 离线"
+		if account.Online {
+			status = "🟢 在线"
+		}
+		line := fmt.Sprintf("%d. %s %s", i+1, account.Phone, status)
+		if account.LastError != "" && !account.Online {
+			line += " | " + account.LastError
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (s *AdminService) accountDetailText(phone string) (string, *model.InlineKeyboardMarkup, error) {
+	account, ok := s.monitorManager.GetMonitorAccount(phone)
+	if !ok {
+		return "", nil, fmt.Errorf("监控号不存在")
+	}
+
+	status := "🔴 离线"
+	if account.Online {
+		status = "🟢 在线"
+	}
+	text := fmt.Sprintf("📱 账号详情\n\n手机号: %s\n状态: %s\nSession: %s", account.Phone, status, filepathBase(account.SessionFile))
+	if strings.TrimSpace(account.LastError) != "" {
+		text += "\n错误: " + account.LastError
+	}
+
+	keyboard := &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{
+				{Text: "🔄 重新连接", CallbackData: callbackAccountRetryPrefix + account.Phone},
+				{Text: "❌ 删除账号", CallbackData: callbackAccountDeletePrefix + account.Phone},
+			},
+			{
+				{Text: "🔙 返回列表", CallbackData: callbackAccountList},
+			},
+		},
+	}
+	return text, keyboard, nil
+}
+
+func (s *AdminService) keywordsText() string {
+	keywords := s.keywordStore.List()
+	if len(keywords) == 0 {
+		return "📝 关键词列表为空"
+	}
+	return fmt.Sprintf("📝 关键词列表 (%d个)：\n\n%s", len(keywords), strings.Join(keywords, " | "))
+}
+
+func (s *AdminService) dmPoolText() string {
+	todaySent, todaySuccess, todayFailed := s.dmStatsToday()
+	return fmt.Sprintf(
+		"💬 私信号池\n\n当前 Go 版正在迁移 Python 版私信号池能力。\n\n今天私信记录：发送 %d | 成功 %d | 失败 %d\n\n下一步会继续补：\n• 私信账号池管理\n• 话术模板\n• 发送设置\n• 私信记录与异常号导出",
+		todaySent,
+		todaySuccess,
+		todayFailed,
+	)
+}
+
+func (s *AdminService) exportText() string {
+	total := len(s.recordStore.MatchRecords())
+	return fmt.Sprintf(
+		"📤 数据导出\n\n当前命中记录: %d 条\n\n可导出：\n• 按时间段导出\n• 按关键词导出\n• 导出全部数据",
+		total,
+	)
+}
+
+func (s *AdminService) exportTimePrompt() string {
+	return "📅 按时间段导出\n\n请输入时间范围：\n示例 1: 09-28-12:00 | 09-28-18:30\n示例 2: 2026-09-28 12:00 | 2026-09-28 18:30"
+}
+
+func (s *AdminService) exportKeywordPrompt() string {
+	keywords := s.keywordStore.List()
+	return "🔑 按关键词导出\n\n当前关键词：\n" + strings.Join(keywords, " | ") + "\n\n请输入要导出的关键词，多个用 | 分隔。"
+}
+
+func (s *AdminService) rulesText() string {
+	state := s.settings.Snapshot()
+	alertChat := "未设置"
+	if state.AlertChatID != 0 {
+		alertChat = strconv.FormatInt(state.AlertChatID, 10)
+	}
+	return fmt.Sprintf(
+		"⚙️ 过滤设置\n\n监控开关: %s\n冷却时间: %d 分钟\nDry-run: %t\n通知群: %s\n最大消息长度: %s\n过滤无用户名: %s\n过滤无头像: %s\n最小账号年龄: %s 天\n私信模板:\n%s",
+		onOff(state.MonitoringEnabled),
+		state.CooldownMinutes,
+		state.DryRun,
+		alertChat,
+		formatOptionalNumber(state.MaxMessageLength, "不限"),
+		onOff(state.FilterNoUsername),
+		onOff(state.FilterNoAvatar),
+		formatOptionalNumber(state.MinAccountAgeDays, "不限"),
+		state.DMTemplate,
+	)
+}
+
+func (s *AdminService) chatsText() string {
+	state := s.settings.Snapshot()
+	body := "暂无监听群"
+	if len(state.MonitorChatIDs) > 0 {
+		parts := make([]string, 0, len(state.MonitorChatIDs))
+		for _, id := range state.MonitorChatIDs {
+			parts = append(parts, strconv.FormatInt(id, 10))
+		}
+		body = strings.Join(parts, "\n")
+	}
+	return fmt.Sprintf("👂 监听群配置\n\n当前共 %d 个：\n%s", len(state.MonitorChatIDs), body)
+}
+
+func (s *AdminService) blacklistText() string {
+	if s.blacklist == nil {
+		return "黑名单未启用"
+	}
+
+	users := s.blacklist.Users()
+	userBody := "暂无黑名单用户"
+	if len(users) > 0 {
+		parts := make([]string, 0, len(users))
+		for _, user := range users {
+			line := strconv.FormatInt(user.UserID, 10)
+			if user.Username != "" {
+				line += " @" + user.Username
+			}
+			parts = append(parts, line)
+		}
+		userBody = strings.Join(parts, "\n")
+	}
+
+	chats := s.blacklist.Chats()
+	chatBody := "暂无黑名单群"
+	if len(chats) > 0 {
+		parts := make([]string, 0, len(chats))
+		for _, chat := range chats {
+			line := strconv.FormatInt(chat.ChatID, 10)
+			if chat.Title != "" {
+				line += " " + chat.Title
+			}
+			parts = append(parts, line)
+		}
+		chatBody = strings.Join(parts, "\n")
+	}
+
+	return fmt.Sprintf("🚫 黑名单\n\n用户 %d 个：\n%s\n\n群 %d 个：\n%s", len(users), userBody, len(chats), chatBody)
+}
+
+func (s *AdminService) statusText() string {
+	active, total := 0, 0
+	if s.monitorManager != nil {
+		active, total = s.monitorManager.MonitorCounts()
+	}
+	matchRecords := s.recordStore.MatchRecords()
+	todaySent, todaySuccess, todayFailed := s.dmStatsToday()
+	return fmt.Sprintf(
+		"📊 运行状态\n\n监控账号: %d在线 / %d离线\n关键词: %d个\n命中记录: %d\n私信记录: 发送 %d | 成功 %d | 失败 %d\n过滤开关: %s\nDry-run: %t",
+		active,
+		total-active,
+		len(s.keywordStore.List()),
+		len(matchRecords),
+		todaySent,
+		todaySuccess,
+		todayFailed,
+		onOff(s.settings.IsMonitoringEnabled()),
+		s.settings.IsDryRun(),
+	)
+}
+
+func (s *AdminService) mainKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{
+				{Text: "📱 监控账号", CallbackData: callbackAccounts},
+				{Text: "📝 关键词管理", CallbackData: callbackKeywords},
+			},
+			{
+				{Text: "💬 私信号池", CallbackData: callbackDMPool},
+				{Text: "📤 数据导出", CallbackData: callbackExport},
+			},
+			{
+				{Text: "⚙️ 过滤设置", CallbackData: callbackFilters},
+				{Text: "📊 运行状态", CallbackData: callbackStatus},
+			},
+		},
+	}
+}
+
+func (s *AdminService) accountsMenuKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{
+				{Text: "➕ 添加新账号", CallbackData: callbackAccountAdd},
+				{Text: "📋 账号列表", CallbackData: callbackAccountList},
+			},
+			{
+				{Text: "🔙 返回主菜单", CallbackData: callbackMain},
+			},
+		},
+	}
+}
+
+func (s *AdminService) accountsListKeyboard() *model.InlineKeyboardMarkup {
+	accounts := s.listMonitorAccounts()
+	rows := make([][]model.InlineKeyboardButton, 0, len(accounts)+1)
+	for _, account := range accounts {
+		status := "🔴"
+		if account.Online {
+			status = "🟢"
+		}
+		rows = append(rows, []model.InlineKeyboardButton{
+			{Text: status + " " + account.Phone, CallbackData: callbackAccountDetailPrefix + account.Phone},
+		})
+	}
+	rows = append(rows, []model.InlineKeyboardButton{
+		{Text: "🔙 返回", CallbackData: callbackAccounts},
+	})
+	return &model.InlineKeyboardMarkup{InlineKeyboard: rows}
+}
+
+func (s *AdminService) backToAccountsKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{{Text: "🔙 返回", CallbackData: callbackAccounts}},
+		},
+	}
+}
+
+func (s *AdminService) keywordsKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{
+				{Text: "➕ 添加关键词", CallbackData: callbackKeywordAdd},
+				{Text: "➖ 删除关键词", CallbackData: callbackKeywordRemove},
+			},
+			{
+				{Text: "🔙 返回主菜单", CallbackData: callbackMain},
+			},
+		},
+	}
+}
+
+func (s *AdminService) dmPoolKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{
+				{Text: "🔙 返回主菜单", CallbackData: callbackMain},
+			},
+		},
+	}
+}
+
+func (s *AdminService) exportKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{{Text: "📅 按时间段导出", CallbackData: callbackExportByTime}},
+			{{Text: "🔑 按关键词导出", CallbackData: callbackExportByKeyword}},
+			{{Text: "📋 导出全部数据", CallbackData: callbackExportAll}},
+			{{Text: "🔙 返回主菜单", CallbackData: callbackMain}},
+		},
+	}
+}
+
+func (s *AdminService) exportFormatKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{{Text: "👤 仅用户名 (TXT)", CallbackData: callbackExportFormatUsers}},
+			{{Text: "🆔 仅用户ID (TXT)", CallbackData: callbackExportFormatIDs}},
+			{{Text: "📊 完整记录 (CSV)", CallbackData: callbackExportFormatCSV}},
+			{{Text: "🔙 返回", CallbackData: callbackExport}},
+		},
+	}
+}
+
+func (s *AdminService) cancelExportKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{{Text: "🔙 取消", CallbackData: callbackExport}},
+		},
+	}
+}
+
+func (s *AdminService) rulesKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{{Text: "开关监控", CallbackData: callbackToggleMonitor}, {Text: "切换 Dry-run", CallbackData: callbackToggleDryRun}},
+			{{Text: "设置冷却", CallbackData: callbackSetCooldown}, {Text: "设置模板", CallbackData: callbackSetTemplate}},
+			{{Text: "最大消息长度", CallbackData: callbackSetMaxLength}, {Text: "最小账号年龄", CallbackData: callbackSetMinAge}},
+			{{Text: "过滤无用户名", CallbackData: callbackToggleNoName}, {Text: "过滤无头像", CallbackData: callbackToggleNoPhoto}},
+			{{Text: "监听群配置", CallbackData: callbackChats}, {Text: "黑名单", CallbackData: callbackBlacklist}},
+			{{Text: "当前聊天设为通知群", CallbackData: callbackSetAlertChat}},
+			{{Text: "🔙 返回主菜单", CallbackData: callbackMain}},
+		},
+	}
+}
+
+func (s *AdminService) chatsKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{{Text: "➕ 添加监听群", CallbackData: callbackAddChat}, {Text: "🗑 移除监听群", CallbackData: callbackRemoveChat}},
+			{{Text: "🔙 返回", CallbackData: callbackFilters}},
+		},
+	}
+}
+
+func (s *AdminService) blacklistKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{{Text: "移出黑名单用户", CallbackData: callbackUnblockUser}, {Text: "移出黑名单群", CallbackData: callbackUnblockChat}},
+			{{Text: "🔙 返回", CallbackData: callbackFilters}},
+		},
+	}
+}
+
+func (s *AdminService) statusKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{{Text: "🔙 返回主菜单", CallbackData: callbackMain}},
+		},
 	}
 }
 
@@ -483,246 +950,188 @@ func (s *AdminService) removeBlockedChats(ids []int64) (int, error) {
 	return removed, nil
 }
 
-func (s *AdminService) mainText() string {
-	active, total := 0, 0
-	if s.monitorManager != nil {
-		active, total = s.monitorManager.MonitorCounts()
+func (s *AdminService) sendExportFile(ctx context.Context, chatID, userID int64, format string) error {
+	exportCtx, ok := s.getExportContext(userID)
+	if !ok {
+		return fmt.Errorf("请先选择导出条件")
 	}
-	return fmt.Sprintf(
-		"🤖 JTBot 关键词监控机器人\n\n📱 监控账号: 在线 %d / 共 %d\n🔑 关键词: %d个",
-		active,
-		total,
-		len(s.keywordStore.List()),
+
+	records := s.filterMatchRecords(exportCtx)
+	if len(records) == 0 {
+		return fmt.Errorf("没有匹配到可导出的数据")
+	}
+
+	var (
+		filename string
+		data     []byte
+		err      error
 	)
-}
 
-func (s *AdminService) accountsText() string {
-	body := "还没有配置监控号。"
-	if s.monitorManager != nil {
-		body = s.monitorManager.MonitorSummary()
+	switch format {
+	case callbackExportFormatUsers:
+		filename = fmt.Sprintf("jtbot_users_%s.txt", time.Now().Format("20060102_150405"))
+		data = []byte(strings.Join(uniqueUsernames(records), "\n"))
+	case callbackExportFormatIDs:
+		filename = fmt.Sprintf("jtbot_userids_%s.txt", time.Now().Format("20060102_150405"))
+		data = []byte(strings.Join(uniqueUserIDs(records), "\n"))
+	case callbackExportFormatCSV:
+		filename = fmt.Sprintf("jtbot_records_%s.csv", time.Now().Format("20060102_150405"))
+		data, err = buildCSV(records)
+	default:
+		return fmt.Errorf("未知导出格式")
 	}
-	return "📱 账号管理\n\n" + body
-}
-
-func (s *AdminService) accountLoginPrompt() string {
-	return "📱 登录监控账号\n\n直接发送手机号给我，例如：\n+66955305284\n\n想加多个账号时，重复点击这个按钮逐个添加。"
-}
-
-func (s *AdminService) keywordsText() string {
-	keywords := s.keywordStore.List()
-	body := "暂无关键词"
-	if len(keywords) > 0 {
-		body = strings.Join(keywords, " | ")
-	}
-	return fmt.Sprintf("📝 关键词管理\n\n当前共 %d 个：\n%s", len(keywords), body)
-}
-
-func (s *AdminService) rulesText() string {
-	state := s.settings.Snapshot()
-	alertChat := "未设置"
-	if state.AlertChatID != 0 {
-		alertChat = strconv.FormatInt(state.AlertChatID, 10)
-	}
-	return fmt.Sprintf(
-		"⚙️ 过滤设置\n\n监控开关: %s\n冷却时间: %d 分钟\nDry-run: %t\n通知群: %s\n最大消息长度: %s\n过滤无用户名: %s\n过滤无头像: %s\n最小账号年龄: %s 天\n私信模板:\n%s",
-		onOff(state.MonitoringEnabled),
-		state.CooldownMinutes,
-		state.DryRun,
-		alertChat,
-		formatOptionalNumber(state.MaxMessageLength, "不限"),
-		onOff(state.FilterNoUsername),
-		onOff(state.FilterNoAvatar),
-		formatOptionalNumber(state.MinAccountAgeDays, "不限"),
-		state.DMTemplate,
-	)
-}
-
-func (s *AdminService) chatsText() string {
-	state := s.settings.Snapshot()
-	body := "暂无监听群"
-	if len(state.MonitorChatIDs) > 0 {
-		parts := make([]string, 0, len(state.MonitorChatIDs))
-		for _, id := range state.MonitorChatIDs {
-			parts = append(parts, strconv.FormatInt(id, 10))
-		}
-		body = strings.Join(parts, "\n")
-	}
-	return fmt.Sprintf("👂 监听群配置\n\n当前共 %d 个：\n%s", len(state.MonitorChatIDs), body)
-}
-
-func (s *AdminService) blacklistText() string {
-	if s.blacklist == nil {
-		return "黑名单未启用"
+	if err != nil {
+		return err
 	}
 
-	users := s.blacklist.Users()
-	userBody := "暂无黑名单用户"
-	if len(users) > 0 {
-		parts := make([]string, 0, len(users))
-		for _, user := range users {
-			line := strconv.FormatInt(user.UserID, 10)
-			if user.Username != "" {
-				line += " @" + user.Username
+	if len(data) == 0 {
+		return fmt.Errorf("导出结果为空")
+	}
+
+	caption := fmt.Sprintf("导出完成，共 %d 条记录。", len(records))
+	if err := s.client.SendDocument(ctx, chatID, filename, data, caption); err != nil {
+		return err
+	}
+	s.clearExportContext(userID)
+	return nil
+}
+
+func (s *AdminService) filterMatchRecords(exportCtx exportContext) []model.MatchRecord {
+	records := s.recordStore.MatchRecords()
+	result := make([]model.MatchRecord, 0, len(records))
+	keywordSet := make(map[string]struct{}, len(exportCtx.keywords))
+	for _, keyword := range exportCtx.keywords {
+		keywordSet[strings.ToLower(strings.TrimSpace(keyword))] = struct{}{}
+	}
+
+	for _, record := range records {
+		switch exportCtx.filterType {
+		case exportByTime:
+			if record.MatchedAt.Before(exportCtx.start) || record.MatchedAt.After(exportCtx.end) {
+				continue
 			}
-			parts = append(parts, line)
-		}
-		userBody = strings.Join(parts, "\n")
-	}
-
-	chats := s.blacklist.Chats()
-	chatBody := "暂无黑名单群"
-	if len(chats) > 0 {
-		parts := make([]string, 0, len(chats))
-		for _, chat := range chats {
-			line := strconv.FormatInt(chat.ChatID, 10)
-			if chat.Title != "" {
-				line += " " + chat.Title
+		case exportByWords:
+			if _, ok := keywordSet[strings.ToLower(strings.TrimSpace(record.Keyword))]; !ok {
+				continue
 			}
-			parts = append(parts, line)
 		}
-		chatBody = strings.Join(parts, "\n")
+		result = append(result, record)
+	}
+	return result
+}
+
+func buildCSV(records []model.MatchRecord) ([]byte, error) {
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+	if err := writer.Write([]string{"用户ID", "用户名", "昵称", "来源群组", "触发关键词", "触发时间", "消息内容", "监控账号"}); err != nil {
+		return nil, err
+	}
+	for _, record := range records {
+		if err := writer.Write([]string{
+			strconv.FormatInt(record.UserID, 10),
+			record.Username,
+			record.Name,
+			record.ChatTitle,
+			record.Keyword,
+			record.MatchedAt.Format("2006-01-02 15:04:05"),
+			record.Message,
+			record.Monitor,
+		}); err != nil {
+			return nil, err
+		}
+	}
+	writer.Flush()
+	return buf.Bytes(), writer.Error()
+}
+
+func uniqueUsernames(records []model.MatchRecord) []string {
+	set := map[string]struct{}{}
+	for _, record := range records {
+		username := strings.TrimSpace(record.Username)
+		if username == "" {
+			continue
+		}
+		if !strings.HasPrefix(username, "@") {
+			username = "@" + username
+		}
+		set[username] = struct{}{}
+	}
+	return sortedKeys(set)
+}
+
+func uniqueUserIDs(records []model.MatchRecord) []string {
+	set := map[string]struct{}{}
+	for _, record := range records {
+		set[strconv.FormatInt(record.UserID, 10)] = struct{}{}
+	}
+	return sortedKeys(set)
+}
+
+func sortedKeys(set map[string]struct{}) []string {
+	items := make([]string, 0, len(set))
+	for item := range set {
+		items = append(items, item)
+	}
+	sort.Strings(items)
+	return items
+}
+
+func parseTimeRange(text string) (time.Time, time.Time, error) {
+	text = strings.TrimSpace(text)
+	parts := strings.Split(text, "|")
+	if len(parts) != 2 {
+		return time.Time{}, time.Time{}, fmt.Errorf("invalid range")
 	}
 
-	return fmt.Sprintf("🚫 黑名单\n\n用户 %d 个：\n%s\n\n群 %d 个：\n%s", len(users), userBody, len(chats), chatBody)
-}
-
-func (s *AdminService) exportText() string {
-	return "📦 数据导出\n\n当前版本先提供数据位置说明：\n- 关键词: configs/keywords.example.json\n- 运行设置: data/settings.json\n- 黑名单: data/blacklist.json\n- 命中记录: data/records.json\n\n如果你要我继续加成一键导出文件，也可以直接再说。"
-}
-
-func (s *AdminService) statusText() string {
-	active, total := 0, 0
-	summary := "暂无监控号"
-	if s.monitorManager != nil {
-		active, total = s.monitorManager.MonitorCounts()
-		summary = s.monitorManager.MonitorSummary()
+	start, err := parseFlexibleTime(parts[0])
+	if err != nil {
+		return time.Time{}, time.Time{}, err
 	}
-	state := s.settings.Snapshot()
-	return fmt.Sprintf(
-		"📊 运行状态\n\n监控账号: 在线 %d / 共 %d\n监控开关: %s\nDry-run: %t\n关键词数: %d\n监听群数: %d\n\n%s",
-		active,
-		total,
-		onOff(state.MonitoringEnabled),
-		state.DryRun,
-		len(s.keywordStore.List()),
-		len(state.MonitorChatIDs),
-		summary,
-	)
-}
-
-func (s *AdminService) helpText() string {
-	return "❓ 帮助\n\n1. 先点“账号管理”登录监控号。\n2. 监控号收到验证码或两步密码提示后，直接把内容发给我。\n3. 在“关键词管理”里增删关键词。\n4. 在“过滤设置”里调整监控规则、监听群和通知群。\n5. `/chatid` 可以查看当前聊天 ID。"
-}
-
-func (s *AdminService) mainKeyboard() *model.InlineKeyboardMarkup {
-	return &model.InlineKeyboardMarkup{
-		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{
-				{Text: "📱 账号管理", CallbackData: callbackAccounts},
-				{Text: "📝 关键词管理", CallbackData: callbackKeywords},
-			},
-			{
-				{Text: "⚙️ 过滤设置", CallbackData: callbackFilters},
-				{Text: "📦 数据导出", CallbackData: callbackExport},
-			},
-			{
-				{Text: "📊 运行状态", CallbackData: callbackStatus},
-				{Text: "❓ 帮助", CallbackData: callbackHelp},
-			},
-		},
+	end, err := parseFlexibleTime(parts[1])
+	if err != nil {
+		return time.Time{}, time.Time{}, err
 	}
-}
-
-func (s *AdminService) accountsKeyboard() *model.InlineKeyboardMarkup {
-	return &model.InlineKeyboardMarkup{
-		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "➕ 登录监控账号", CallbackData: callbackAccountLogin}},
-			{{Text: "⬅️ 返回主页", CallbackData: callbackMain}},
-		},
+	if !end.After(start) {
+		return time.Time{}, time.Time{}, fmt.Errorf("end must be after start")
 	}
+	return start, end, nil
 }
 
-func (s *AdminService) keywordsKeyboard() *model.InlineKeyboardMarkup {
-	return &model.InlineKeyboardMarkup{
-		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "➕ 添加关键词", CallbackData: callbackKeywordAdd}, {Text: "🗑 删除关键词", CallbackData: callbackKeywordRemove}},
-			{{Text: "⬅️ 返回主页", CallbackData: callbackMain}},
-		},
+func parseFlexibleTime(raw string) (time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	now := time.Now()
+	location := now.Location()
+	layouts := []string{
+		"2006-01-02 15:04",
+		"2006-01-02-15:04",
+		"01-02 15:04",
+		"01-02-15:04",
 	}
-}
+	for _, layout := range layouts {
+		if strings.HasPrefix(layout, "2006") {
+			if parsed, err := time.ParseInLocation(layout, raw, location); err == nil {
+				return parsed, nil
+			}
+			continue
+		}
 
-func (s *AdminService) rulesKeyboard() *model.InlineKeyboardMarkup {
-	return &model.InlineKeyboardMarkup{
-		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "开关监控", CallbackData: callbackToggleMonitor}, {Text: "切换 Dry-run", CallbackData: callbackToggleDryRun}},
-			{{Text: "设置冷却", CallbackData: callbackSetCooldown}, {Text: "设置模板", CallbackData: callbackSetTemplate}},
-			{{Text: "最大消息长度", CallbackData: callbackSetMaxLength}, {Text: "最小账号年龄", CallbackData: callbackSetMinAge}},
-			{{Text: "过滤无用户名", CallbackData: callbackToggleNoName}, {Text: "过滤无头像", CallbackData: callbackToggleNoPhoto}},
-			{{Text: "监听群配置", CallbackData: callbackChats}, {Text: "黑名单", CallbackData: callbackBlacklist}},
-			{{Text: "当前聊天设为通知群", CallbackData: callbackSetAlertChat}},
-			{{Text: "⬅️ 返回主页", CallbackData: callbackMain}},
-		},
+		withYear := fmt.Sprintf("%d-%s", now.Year(), raw)
+		yearLayout := "2006-" + layout
+		if parsed, err := time.ParseInLocation(yearLayout, withYear, location); err == nil {
+			return parsed, nil
+		}
 	}
+	return time.Time{}, fmt.Errorf("unsupported time format")
 }
 
-func (s *AdminService) chatsKeyboard() *model.InlineKeyboardMarkup {
-	return &model.InlineKeyboardMarkup{
-		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "➕ 添加监听群", CallbackData: callbackAddChat}, {Text: "🗑 移除监听群", CallbackData: callbackRemoveChat}},
-			{{Text: "⬅️ 返回过滤设置", CallbackData: callbackFilters}},
-		},
+func filepathBase(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "-"
 	}
-}
-
-func (s *AdminService) blacklistKeyboard() *model.InlineKeyboardMarkup {
-	return &model.InlineKeyboardMarkup{
-		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "移出黑名单用户", CallbackData: callbackUnblockUser}, {Text: "移出黑名单群", CallbackData: callbackUnblockChat}},
-			{{Text: "⬅️ 返回过滤设置", CallbackData: callbackFilters}},
-		},
-	}
-}
-
-func (s *AdminService) exportKeyboard() *model.InlineKeyboardMarkup {
-	return &model.InlineKeyboardMarkup{
-		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "⬅️ 返回主页", CallbackData: callbackMain}},
-		},
-	}
-}
-
-func (s *AdminService) statusKeyboard() *model.InlineKeyboardMarkup {
-	return &model.InlineKeyboardMarkup{
-		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "⬅️ 返回主页", CallbackData: callbackMain}},
-		},
-	}
-}
-
-func (s *AdminService) helpKeyboard() *model.InlineKeyboardMarkup {
-	return &model.InlineKeyboardMarkup{
-		InlineKeyboard: [][]model.InlineKeyboardButton{
-			{{Text: "⬅️ 返回主页", CallbackData: callbackMain}},
-		},
-	}
-}
-
-func (s *AdminService) setPending(userID int64, action pendingAction) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.pending[userID] = action
-}
-
-func (s *AdminService) getPending(userID int64) pendingAction {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.pending[userID]
-}
-
-func (s *AdminService) clearPending(userID int64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.pending, userID)
+	path = strings.ReplaceAll(path, "\\", "/")
+	parts := strings.Split(path, "/")
+	return parts[len(parts)-1]
 }
 
 func splitInputParts(text string) []string {
@@ -767,4 +1176,65 @@ func formatOptionalNumber(value int, disabled string) string {
 		return disabled
 	}
 	return strconv.Itoa(value)
+}
+
+func (s *AdminService) listMonitorAccounts() []MonitorAccountInfo {
+	if s.monitorManager == nil {
+		return nil
+	}
+	return s.monitorManager.ListMonitorAccounts()
+}
+
+func (s *AdminService) dmStatsToday() (sent, success, failed int) {
+	today := time.Now().Format("2006-01-02")
+	for _, record := range s.recordStore.DMRecords() {
+		if record.SentAt.Format("2006-01-02") != today {
+			continue
+		}
+		sent++
+		switch record.Status {
+		case "sent", "success":
+			success++
+		case "failed":
+			failed++
+		}
+	}
+	return sent, success, failed
+}
+
+func (s *AdminService) setPending(userID int64, action pendingAction) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.pending[userID] = action
+}
+
+func (s *AdminService) getPending(userID int64) pendingAction {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.pending[userID]
+}
+
+func (s *AdminService) clearPending(userID int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.pending, userID)
+}
+
+func (s *AdminService) setExportContext(userID int64, ctx exportContext) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.exportCtx[userID] = ctx
+}
+
+func (s *AdminService) getExportContext(userID int64) (exportContext, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ctx, ok := s.exportCtx[userID]
+	return ctx, ok
+}
+
+func (s *AdminService) clearExportContext(userID int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.exportCtx, userID)
 }
