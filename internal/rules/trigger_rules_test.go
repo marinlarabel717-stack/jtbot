@@ -31,6 +31,9 @@ func TestCanQueueDMBlocksUserChatAndTextCooldowns(t *testing.T) {
 	if engine.CanQueueDM(model.DMJob{TargetUserID: 1001, ChatID: -1002, SourceText: "other"}) {
 		t.Fatal("expected user cooldown to block repeat dm")
 	}
+	if reason := engine.ExplainDMBlockReason(model.DMJob{TargetUserID: 1001, ChatID: -1002, SourceText: "other"}); reason == "" {
+		t.Fatal("expected plain-language block reason for user cooldown")
+	}
 
 	engineNoUserCooldown, recordStoreNoUser := newRuleTestEngine(t, storage.RuntimeSettings{
 		MonitoringEnabled:   true,
@@ -50,8 +53,14 @@ func TestCanQueueDMBlocksUserChatAndTextCooldowns(t *testing.T) {
 	if engineNoUserCooldown.CanQueueDM(model.DMJob{TargetUserID: 1001, ChatID: -1001, SourceText: "other"}) {
 		t.Fatal("expected same chat cooldown to block repeat dm")
 	}
+	if reason := engineNoUserCooldown.ExplainDMBlockReason(model.DMJob{TargetUserID: 1001, ChatID: -1001, SourceText: "other"}); reason == "" {
+		t.Fatal("expected plain-language block reason for chat cooldown")
+	}
 	if engineNoUserCooldown.CanQueueDM(model.DMJob{TargetUserID: 1001, ChatID: -1002, SourceText: "hello world"}) {
 		t.Fatal("expected same text cooldown to block repeat dm")
+	}
+	if reason := engineNoUserCooldown.ExplainDMBlockReason(model.DMJob{TargetUserID: 1001, ChatID: -1002, SourceText: "hello world"}); reason == "" {
+		t.Fatal("expected plain-language block reason for text cooldown")
 	}
 	if !engineNoUserCooldown.CanQueueDM(model.DMJob{TargetUserID: 1001, ChatID: -1002, SourceText: "fresh text"}) {
 		t.Fatal("expected fresh chat/text combination to pass")

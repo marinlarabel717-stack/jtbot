@@ -1,10 +1,12 @@
 package service
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/csv"
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -33,6 +35,9 @@ const (
 	callbackDMList              = "admin:dm:list"
 	callbackDMDetailPrefix      = "admin:dm:detail:"
 	callbackDMCheckPrefix       = "admin:dm:check:"
+	callbackDMCheckAll          = "admin:dm:check_all"
+	callbackDMExportAbnormal    = "admin:dm:export_abnormal"
+	callbackDMKeepOnlyNormal    = "admin:dm:keep_only_normal"
 	callbackDMRetryPrefix       = "admin:dm:retry:"
 	callbackDMDeletePrefix      = "admin:dm:delete:"
 	callbackDMTemplates         = "admin:dm:templates"
@@ -134,15 +139,17 @@ type DMAccountInfo struct {
 	TodaySent       int
 	TodaySuccess    int
 	TodayFailed     int
+	StatusCode      string
 	StatusSummary   string
 	StatusCheckedAt time.Time
 	CanSendDM       bool
 }
 
 type DMAccountCheckResult struct {
-	Summary   string
-	CanSendDM bool
-	CheckedAt time.Time
+	StatusCode string
+	Summary    string
+	CanSendDM  bool
+	CheckedAt  time.Time
 }
 
 type MonitorLoginManager interface {
@@ -328,6 +335,12 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 		alert = "把 session 文件直接发给我"
 	case callbackDMList:
 		text, keyboard = s.dmAccountsText(), s.dmAccountsKeyboard()
+	case callbackDMCheckAll:
+		return true, s.handleDMCheckAll(ctx, callback)
+	case callbackDMExportAbnormal:
+		return true, s.handleDMExportAbnormal(ctx, callback)
+	case callbackDMKeepOnlyNormal:
+		return true, s.handleDMKeepOnlyNormal(ctx, callback)
 	case callbackDMTemplates:
 		text, keyboard = s.dmTemplatesText(), s.dmTemplatesKeyboard()
 	case callbackDMTemplateAdd:
@@ -930,6 +943,9 @@ func (s *AdminService) dmAccountDetailText(phone string) (string, *model.InlineK
 	if strings.TrimSpace(account.LastError) != "" {
 		text += "\n错误: " + account.LastError
 	}
+	if label := dmStatusLabel(account.StatusCode); label != "" {
+		text += "\n账号限制: " + label
+	}
 	if strings.TrimSpace(account.StatusSummary) != "" {
 		text += "\nSpamBot 检测: " + account.StatusSummary
 		if !account.StatusCheckedAt.IsZero() {
@@ -1225,6 +1241,7 @@ func (s *AdminService) dmPoolKeyboard() *model.InlineKeyboardMarkup {
 			},
 			{
 				{Text: "📋 账号列表", CallbackData: callbackDMList},
+				{Text: "🔍 一键检查状态", CallbackData: callbackDMCheckAll},
 			},
 			{
 				{Text: "📝 话术模板", CallbackData: callbackDMTemplates},
@@ -1257,6 +1274,7 @@ func (s *AdminService) dmAccountsKeyboard() *model.InlineKeyboardMarkup {
 			{Text: "🔌 连接私信号", CallbackData: callbackDMConnect},
 			{Text: "📤 上传 Session", CallbackData: callbackDMUpload},
 		},
+		[]model.InlineKeyboardButton{{Text: "🔍 一键检查状态", CallbackData: callbackDMCheckAll}},
 		[]model.InlineKeyboardButton{{Text: "🔙 返回", CallbackData: callbackDMPool}},
 	)
 	return &model.InlineKeyboardMarkup{InlineKeyboard: rows}
@@ -1774,6 +1792,299 @@ func (s *AdminService) dmStatsToday() (sent, success, failed int) {
 		}
 	}
 	return sent, success, failed
+}
+
+func (s *AdminService) handleDMCheckAll(ctx context.Context, callback *model.CallbackQuery) error {
+	if s.dmManager == nil {
+		return s.client.AnswerCallbackQuery(ctx, callback.ID, "当前没有可用的私信号管理器")
+	}
+
+	accounts := s.listDMAccounts()
+	if len(accounts) == 0 {
+		return s.client.AnswerCallbackQuery(ctx, callback.ID, "当前没有私信号可检查")
+	}
+
+	if err := s.client.AnswerCallbackQuery(ctx, callback.ID, "开始批量检查私信号状态"); err != nil {
+		return err
+	}
+
+	counts := newDMStatusCounts()
+	if err := s.editMessageText(ctx, callback.Message.Chat.ID, callback.Message.MessageID, s.dmCheckProgressText(0, len(accounts), counts), nil); err != nil {
+		return err
+	}
+
+	for i, account := range accounts {
+		code := "failed"
+		if result, err := s.dmManager.CheckDMAccount(ctx, account.Phone); err == nil {
+			code = normalizeDMStatusCode(result.StatusCode)
+		}
+		counts[code]++
+
+		if i == len(accounts)-1 || (i+1)%3 == 0 {
+			if err := s.editMessageText(ctx, callback.Message.Chat.ID, callback.Message.MessageID, s.dmCheckProgressText(i+1, len(accounts), counts), nil); err != nil {
+				return err
+			}
+		}
+	}
+
+	return s.editMessageText(ctx, callback.Message.Chat.ID, callback.Message.MessageID, s.dmCheckResultText(len(accounts), counts), s.dmCheckActionsKeyboard())
+}
+
+func (s *AdminService) handleDMExportAbnormal(ctx context.Context, callback *model.CallbackQuery) error {
+	if err := s.client.AnswerCallbackQuery(ctx, callback.ID, "开始导出异常私信号"); err != nil {
+		return err
+	}
+
+	accounts := s.collectDMAccountsByStatus(false)
+	if len(accounts) == 0 {
+		return s.editMessageText(ctx, callback.Message.Chat.ID, callback.Message.MessageID, "✅ 当前没有异常私信号，所有账号都属于正常无限制状态。", s.dmCheckActionsKeyboard())
+	}
+
+	if err := s.sendDMAccountExportDocuments(ctx, callback.Message.Chat.ID, accounts, "异常私信号"); err != nil {
+		return err
+	}
+
+	removed, failed := s.deleteDMAccounts(ctx, accounts)
+	text := fmt.Sprintf("📤 异常账号已导出\n\n已导出: %d 个\n已删除: %d 个\n删除失败: %d 个\n\n已保留: 仅正常无限制账号", len(accounts), removed, failed)
+	return s.editMessageText(ctx, callback.Message.Chat.ID, callback.Message.MessageID, text, s.dmAccountsKeyboard())
+}
+
+func (s *AdminService) handleDMKeepOnlyNormal(ctx context.Context, callback *model.CallbackQuery) error {
+	if err := s.client.AnswerCallbackQuery(ctx, callback.ID, "开始清理异常私信号"); err != nil {
+		return err
+	}
+
+	accounts := s.collectDMAccountsByStatus(false)
+	if len(accounts) == 0 {
+		return s.editMessageText(ctx, callback.Message.Chat.ID, callback.Message.MessageID, "✅ 当前没有异常私信号，已经只保留正常无限制账号。", s.dmAccountsKeyboard())
+	}
+
+	removed, failed := s.deleteDMAccounts(ctx, accounts)
+	text := fmt.Sprintf("🧹 私信号池已清理\n\n已删除异常账号: %d 个\n删除失败: %d 个\n当前只保留正常无限制账号。", removed, failed)
+	return s.editMessageText(ctx, callback.Message.Chat.ID, callback.Message.MessageID, text, s.dmAccountsKeyboard())
+}
+
+func (s *AdminService) dmCheckProgressText(done, total int, counts map[string]int) string {
+	return fmt.Sprintf(
+		"🔍 正在检查私信号状态 (%d/%d)\n\n%s",
+		done,
+		total,
+		formatDMStatusCounts(counts),
+	)
+}
+
+func (s *AdminService) dmCheckResultText(total int, counts map[string]int) string {
+	return fmt.Sprintf(
+		"✅ 私信号状态检查完成\n\n总计: %d 个账号\n%s\n⚠️ 接下来你可以导出异常账号，或者直接只保留正常无限制账号。",
+		total,
+		formatDMStatusCounts(counts),
+	)
+}
+
+func (s *AdminService) dmCheckActionsKeyboard() *model.InlineKeyboardMarkup {
+	return &model.InlineKeyboardMarkup{
+		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{
+				{Text: "📤 导出异常并删除", CallbackData: callbackDMExportAbnormal},
+				{Text: "🧹 仅保留正常账号", CallbackData: callbackDMKeepOnlyNormal},
+			},
+			{
+				{Text: "📋 返回账号列表", CallbackData: callbackDMList},
+				{Text: "🔙 返回私信号池", CallbackData: callbackDMPool},
+			},
+		},
+	}
+}
+
+func (s *AdminService) collectDMAccountsByStatus(keepActive bool) []DMAccountInfo {
+	accounts := s.listDMAccounts()
+	filtered := make([]DMAccountInfo, 0, len(accounts))
+	for _, account := range accounts {
+		code := effectiveDMStatusCode(account)
+		if keepActive {
+			if code == "active" {
+				filtered = append(filtered, account)
+			}
+			continue
+		}
+		if code != "active" {
+			filtered = append(filtered, account)
+		}
+	}
+	return filtered
+}
+
+func (s *AdminService) deleteDMAccounts(ctx context.Context, accounts []DMAccountInfo) (removed int, failed int) {
+	for _, account := range accounts {
+		if err := s.dmManager.DeleteDMAccount(ctx, account.Phone); err != nil {
+			failed++
+			continue
+		}
+		removed++
+	}
+	return removed, failed
+}
+
+func (s *AdminService) sendDMAccountExportDocuments(ctx context.Context, chatID int64, accounts []DMAccountInfo, label string) error {
+	timestamp := time.Now().Format("20060102_150405")
+
+	zipData, sessionCount, err := buildDMAccountSessionsZip(accounts)
+	if err != nil {
+		return err
+	}
+	if sessionCount > 0 {
+		filename := fmt.Sprintf("dm_abnormal_sessions_%s.zip", timestamp)
+		caption := fmt.Sprintf("📦 %s Session 打包（%d 个）", label, sessionCount)
+		if err := s.client.SendDocument(ctx, chatID, filename, zipData, caption); err != nil {
+			return err
+		}
+	}
+
+	reportData := buildDMAccountReport(accounts, label)
+	reportName := fmt.Sprintf("dm_abnormal_accounts_%s.txt", timestamp)
+	reportCaption := fmt.Sprintf("📋 %s列表（%d 个）", label, len(accounts))
+	return s.client.SendDocument(ctx, chatID, reportName, reportData, reportCaption)
+}
+
+func buildDMAccountSessionsZip(accounts []DMAccountInfo) ([]byte, int, error) {
+	var buf bytes.Buffer
+	writer := zip.NewWriter(&buf)
+	count := 0
+
+	for _, account := range accounts {
+		path := strings.TrimSpace(account.SessionFile)
+		if path == "" {
+			continue
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+
+		name := filepathBase(path)
+		entry, err := writer.Create(name)
+		if err != nil {
+			_ = writer.Close()
+			return nil, count, err
+		}
+		if _, err := entry.Write(data); err != nil {
+			_ = writer.Close()
+			return nil, count, err
+		}
+		count++
+	}
+
+	if err := writer.Close(); err != nil {
+		return nil, count, err
+	}
+	return buf.Bytes(), count, nil
+}
+
+func buildDMAccountReport(accounts []DMAccountInfo, label string) []byte {
+	lines := []string{
+		fmt.Sprintf("# %s", label),
+		fmt.Sprintf("# 导出时间: %s", time.Now().Format("2006-01-02 15:04:05")),
+		fmt.Sprintf("# 共 %d 个账号", len(accounts)),
+		"",
+	}
+
+	for _, account := range accounts {
+		code := effectiveDMStatusCode(account)
+		line := fmt.Sprintf(
+			"%s | %s | 今日发送 %d 条 | 今日成功 %d 条 | 今日失败 %d 条",
+			account.Phone,
+			dmStatusLabel(code),
+			account.TodaySent,
+			account.TodaySuccess,
+			account.TodayFailed,
+		)
+		if summary := strings.TrimSpace(account.StatusSummary); summary != "" {
+			line += " | " + summary
+		}
+		lines = append(lines, line)
+	}
+
+	return []byte(strings.Join(lines, "\n"))
+}
+
+func newDMStatusCounts() map[string]int {
+	return map[string]int{
+		"active":     0,
+		"restricted": 0,
+		"spam":       0,
+		"banned":     0,
+		"frozen":     0,
+		"failed":     0,
+		"unknown":    0,
+	}
+}
+
+func formatDMStatusCounts(counts map[string]int) string {
+	lines := []string{
+		fmt.Sprintf("✅ 正常无限制: %d", counts["active"]),
+		fmt.Sprintf("⚠️ 临时限制 / 双向限制: %d", counts["restricted"]),
+		fmt.Sprintf("📵 垃圾消息风控: %d", counts["spam"]),
+		fmt.Sprintf("🚫 封禁账号: %d", counts["banned"]),
+		fmt.Sprintf("❄️ 冻结 / 审核中: %d", counts["frozen"]),
+		fmt.Sprintf("🔌 离线 / 检查失败: %d", counts["failed"]),
+	}
+	if counts["unknown"] > 0 {
+		lines = append(lines, fmt.Sprintf("❓ 未识别状态: %d", counts["unknown"]))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func effectiveDMStatusCode(account DMAccountInfo) string {
+	code := normalizeDMStatusCode(account.StatusCode)
+	if code != "unknown" || strings.TrimSpace(account.StatusSummary) == "" {
+		return code
+	}
+
+	summary := strings.ToLower(strings.TrimSpace(account.StatusSummary))
+	switch {
+	case strings.Contains(summary, "正常"), strings.Contains(summary, "无限制"):
+		return "active"
+	case strings.Contains(summary, "双向"), strings.Contains(summary, "临时限制"):
+		return "restricted"
+	case strings.Contains(summary, "风控"), strings.Contains(summary, "垃圾消息"):
+		return "spam"
+	case strings.Contains(summary, "封禁"), strings.Contains(summary, "永久限制"):
+		return "banned"
+	case strings.Contains(summary, "审核"), strings.Contains(summary, "验证"), strings.Contains(summary, "冻结"):
+		return "frozen"
+	case strings.Contains(summary, "失败"), strings.Contains(summary, "离线"):
+		return "failed"
+	default:
+		return "unknown"
+	}
+}
+
+func normalizeDMStatusCode(code string) string {
+	switch strings.TrimSpace(strings.ToLower(code)) {
+	case "active", "restricted", "spam", "banned", "frozen", "failed":
+		return strings.TrimSpace(strings.ToLower(code))
+	default:
+		return "unknown"
+	}
+}
+
+func dmStatusLabel(code string) string {
+	switch normalizeDMStatusCode(code) {
+	case "active":
+		return "✅ 正常无限制"
+	case "restricted":
+		return "⚠️ 临时限制 / 双向限制"
+	case "spam":
+		return "📵 垃圾消息风控"
+	case "banned":
+		return "🚫 封禁"
+	case "frozen":
+		return "❄️ 冻结 / 审核中"
+	case "failed":
+		return "🔌 离线 / 检查失败"
+	default:
+		return "❓ 未识别"
+	}
 }
 
 func (s *AdminService) sendFailedDMExport(ctx context.Context, chatID int64) error {

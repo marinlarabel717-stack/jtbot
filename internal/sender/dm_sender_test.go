@@ -3,6 +3,7 @@ package sender
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -99,6 +100,15 @@ func TestSenderNotifiesFailureInChinese(t *testing.T) {
 	}
 	if !strings.Contains(messages[0], "失败原因") {
 		t.Fatalf("expected failure reason in notification, got %q", messages[0])
+	}
+}
+
+func TestTranslateDMErrorUsernameNotOccupied(t *testing.T) {
+	t.Parallel()
+
+	got := TranslateDMError(errors.New("rpcDoRequest: rpc error code 400: USERNAME_NOT_OCCUPIED"))
+	if !strings.Contains(got, "目标用户名已经不存在了") {
+		t.Fatalf("expected plain-language translation, got %q", got)
 	}
 }
 

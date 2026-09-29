@@ -158,8 +158,8 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 		SourceText:   content,
 		TriggeredAt:  matchedAt,
 	}
-	if !s.rules.CanQueueDM(job) {
-		s.logger.Infof("user=%d filtered by dm cooldown rules, skip dm", msg.From.ID)
+	if reason := s.rules.ExplainDMBlockReason(job); reason != "" {
+		s.logger.Infof("跳过私信：用户=%d，原因=%s", msg.From.ID, reason)
 		return nil
 	}
 

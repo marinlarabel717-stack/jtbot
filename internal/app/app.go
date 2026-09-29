@@ -29,6 +29,7 @@ type monitorRuntime struct {
 	sessionFile string
 	online      bool
 	lastError   string
+	statusCode  string
 	statusNote  string
 	checkedAt   time.Time
 	canSendDM   bool
@@ -59,6 +60,25 @@ type App struct {
 	dmIndex     int
 	lastDMAlert time.Time
 	wg          sync.WaitGroup
+}
+
+func dmStatusCodeSummary(code string) string {
+	switch strings.TrimSpace(strings.ToLower(code)) {
+	case "active":
+		return "账号状态正常，目前没有私信限制"
+	case "restricted":
+		return "账号存在私信限制，当前只能部分发送或只能双向发送"
+	case "spam":
+		return "账号触发了垃圾消息风控，当前不适合继续私信"
+	case "banned":
+		return "账号已被永久限制或封禁，不能再用于私信"
+	case "frozen":
+		return "账号处于等待验证或审核状态，暂时不能稳定私信"
+	case "failed":
+		return "账号当前离线或检查失败，暂时无法确认状态"
+	default:
+		return "未能明确识别账号状态，请人工查看最新回复"
+	}
 }
 
 func New() (*App, error) {
@@ -408,6 +428,7 @@ func (a *App) ListDMAccounts() []service.DMAccountInfo {
 		if runtime, ok := a.dmAccounts[account.Phone]; ok && runtime != nil {
 			info.Online = runtime.online
 			info.LastError = runtime.lastError
+			info.StatusCode = runtime.statusCode
 			info.StatusSummary = runtime.statusNote
 			info.StatusCheckedAt = runtime.checkedAt
 			info.CanSendDM = runtime.canSendDM
@@ -441,20 +462,42 @@ func (a *App) CheckDMAccount(ctx context.Context, phone string) (service.DMAccou
 	runtime := a.dmAccounts[phone]
 	a.runMu.RUnlock()
 	if runtime == nil || runtime.client == nil || !runtime.online {
+		now := time.Now()
+		a.runMu.Lock()
+		current := a.dmAccounts[phone]
+		if current == nil {
+			current = &monitorRuntime{}
+			a.dmAccounts[phone] = current
+		}
+		current.statusCode = "failed"
+		current.statusNote = dmStatusCodeSummary("failed")
+		current.checkedAt = now
+		current.canSendDM = false
+		a.runMu.Unlock()
 		return service.DMAccountCheckResult{}, errors.New("私信号当前离线，请先重新连接后再检查")
 	}
 
 	checkCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	summary, canSend, err := runtime.client.CheckSpamBotStatus(checkCtx)
+	summary, statusCode, canSend, err := runtime.client.CheckSpamBotStatus(checkCtx)
 	if err != nil {
+		now := time.Now()
+		a.runMu.Lock()
+		if current := a.dmAccounts[phone]; current != nil {
+			current.statusCode = "failed"
+			current.statusNote = "检查失败：" + sender.TranslateDMError(err)
+			current.checkedAt = now
+			current.canSendDM = false
+		}
+		a.runMu.Unlock()
 		return service.DMAccountCheckResult{}, err
 	}
 
 	now := time.Now()
 	a.runMu.Lock()
 	if current := a.dmAccounts[phone]; current != nil {
+		current.statusCode = statusCode
 		current.statusNote = summary
 		current.checkedAt = now
 		current.canSendDM = canSend
@@ -462,9 +505,10 @@ func (a *App) CheckDMAccount(ctx context.Context, phone string) (service.DMAccou
 	a.runMu.Unlock()
 
 	return service.DMAccountCheckResult{
-		Summary:   summary,
-		CanSendDM: canSend,
-		CheckedAt: now,
+		StatusCode: statusCode,
+		Summary:    summary,
+		CanSendDM:  canSend,
+		CheckedAt:  now,
 	}, nil
 }
 
@@ -928,7 +972,7 @@ func (a *App) SendDM(ctx context.Context, _ *tg.Client, job model.DMJob, text st
 			a.clearDMAccountSendError(phone)
 			return phone, nil
 		} else {
-			lastErr = fmt.Errorf("私信号 %s 发送失败：%w", phone, err)
+			lastErr = fmt.Errorf("私信号 %s 发送失败：%s", phone, sender.TranslateDMError(err))
 			a.rememberDMAccountSendError(phone, lastErr.Error())
 		}
 	}

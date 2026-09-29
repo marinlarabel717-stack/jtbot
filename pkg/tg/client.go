@@ -207,22 +207,22 @@ func (c *Client) SendDirectMessage(ctx context.Context, userID int64, username, 
 	return c.sendText(ctx, peer, text)
 }
 
-func (c *Client) CheckSpamBotStatus(ctx context.Context) (string, bool, error) {
+func (c *Client) CheckSpamBotStatus(ctx context.Context) (string, string, bool, error) {
 	if c.baseURL != "" {
-		return "", false, errors.New("Bot API 模式不支持 SpamBot 检查")
+		return "", "failed", false, errors.New("Bot API 模式不支持 SpamBot 检查")
 	}
 
 	peer, err := c.resolveUsernamePeer(ctx, "SpamBot")
 	if err != nil {
-		return "", false, fmt.Errorf("无法定位 @SpamBot：%w", err)
+		return "", "failed", false, fmt.Errorf("无法定位 @SpamBot：%w", err)
 	}
 	if err := c.sendText(ctx, peer, "/start"); err != nil {
-		return "", false, fmt.Errorf("无法向 @SpamBot 发起检测：%w", err)
+		return "", "failed", false, fmt.Errorf("无法向 @SpamBot 发起检测：%w", err)
 	}
 
 	select {
 	case <-ctx.Done():
-		return "", false, ctx.Err()
+		return "", "failed", false, ctx.Err()
 	case <-time.After(2 * time.Second):
 	}
 
@@ -230,7 +230,7 @@ func (c *Client) CheckSpamBotStatus(ctx context.Context) (string, bool, error) {
 	api := c.api
 	c.mu.RUnlock()
 	if api == nil {
-		return "", false, errors.New("telegram api is not ready")
+		return "", "failed", false, errors.New("telegram api is not ready")
 	}
 
 	history, err := api.MessagesGetHistory(ctx, &mtproto.MessagesGetHistoryRequest{
@@ -238,15 +238,16 @@ func (c *Client) CheckSpamBotStatus(ctx context.Context) (string, bool, error) {
 		Limit: 5,
 	})
 	if err != nil {
-		return "", false, fmt.Errorf("读取 @SpamBot 回复失败：%w", err)
+		return "", "failed", false, fmt.Errorf("读取 @SpamBot 回复失败：%w", err)
 	}
 
 	raw := latestIncomingText(history)
 	if strings.TrimSpace(raw) == "" {
-		return "未拿到 @SpamBot 的有效回复，请稍后再试", false, nil
+		return "未拿到 @SpamBot 的有效回复，请稍后再试", "unknown", false, nil
 	}
 
-	return interpretSpamBotText(raw), spamBotCanSend(raw), nil
+	code, summary, canSend := interpretSpamBotStatus(raw)
+	return summary, code, canSend, nil
 }
 
 func (c *Client) EditMessageText(ctx context.Context, chatID int64, messageID int64, text string, replyMarkup *model.InlineKeyboardMarkup) error {
@@ -625,33 +626,27 @@ func latestIncomingText(history mtproto.MessagesMessagesClass) string {
 	return ""
 }
 
-func interpretSpamBotText(raw string) string {
+func interpretSpamBotStatus(raw string) (string, string, bool) {
 	text := normalizeSpamBotText(raw)
 
 	switch {
 	case containsAny(text, "some phone numbers may trigger a harsh response", "phone numbers may trigger"):
-		return "账号可正常私信，但当前地区号段可能更容易触发风控"
+		return "active", "账号目前可以正常私信，但这个号段更容易触发风控，建议控制发送节奏", true
 	case containsAny(text, "good news, no limits are currently applied", "you're free as a bird", "no limits", "free as a bird", "no restrictions", "all good", "account is free", "not limited"):
-		return "账号状态正常，目前没有私信限制"
+		return "active", "账号状态正常，目前没有私信限制", true
+	case containsAny(text, "mutual contacts", "only people in your contacts", "only send messages to mutual contacts", "双向", "互相添加"):
+		return "restricted", "账号目前只能给双向联系人发消息，不能正常私信陌生人", false
 	case containsAny(text, "account is now limited until", "limited until", "moderators have confirmed the report", "users found your messages annoying", "will be automatically released", "temporarily limited"):
-		return "账号被临时限制，暂时不能正常私信"
+		return "restricted", "账号被临时限制，暂时不能正常私信", false
 	case containsAny(text, "actions can trigger a harsh response from our anti-spam systems", "account was limited", "you will not be able to send messages"):
-		return "账号触发了垃圾消息风控，当前不适合继续私信"
+		return "spam", "账号触发了垃圾消息风控，当前不适合继续私信", false
 	case containsAny(text, "permanently banned", "account has been frozen permanently", "permanently restricted", "banned permanently", "blocked for violations", "terms of service", "banned", "suspended"):
-		return "账号已被永久限制或封禁，不能再用于私信"
+		return "banned", "账号已被永久限制或封禁，不能再用于私信", false
 	case containsAny(text, "wait", "pending", "verification"):
-		return "账号处于等待验证或审核状态，暂时不能稳定私信"
+		return "frozen", "账号处于等待验证或审核状态，暂时不能稳定私信", false
 	default:
-		return "未能明确识别账号状态，请人工查看 @SpamBot 最新回复"
+		return "unknown", "未能明确识别账号状态，请人工查看 @SpamBot 最新回复", false
 	}
-}
-
-func spamBotCanSend(raw string) bool {
-	text := normalizeSpamBotText(raw)
-	if containsAny(text, "some phone numbers may trigger a harsh response", "phone numbers may trigger") {
-		return true
-	}
-	return containsAny(text, "good news, no limits are currently applied", "you're free as a bird", "no limits", "free as a bird", "no restrictions", "all good", "account is free", "not limited")
 }
 
 func normalizeSpamBotText(text string) string {

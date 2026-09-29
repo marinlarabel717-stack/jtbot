@@ -59,14 +59,18 @@ func (e *Engine) MarkProcessed(chatID, messageID int64) bool {
 }
 
 func (e *Engine) CanQueueDM(job model.DMJob) bool {
+	return e.ExplainDMBlockReason(job) == ""
+}
+
+func (e *Engine) ExplainDMBlockReason(job model.DMJob) string {
 	if e.recordStore.IsUserInCooldown(job.TargetUserID, e.settings.Cooldown()) {
-		return false
+		return "同一个用户还在重复私信冷却时间内，这次先不再私信"
 	}
 	if e.recordStore.IsUserInChatCooldown(job.TargetUserID, job.ChatID, e.settings.ChatCooldown()) {
-		return false
+		return "这个用户在当前群最近已经私信过了，这次先跳过"
 	}
 	if e.recordStore.IsUserTextInCooldown(job.TargetUserID, job.ChatID, job.SourceText, e.settings.TextCooldown()) {
-		return false
+		return "这个用户最近发过相同内容，命中同内容冷却，这次先跳过"
 	}
-	return true
+	return ""
 }
