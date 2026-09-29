@@ -57,6 +57,7 @@ const (
 type AdminService struct {
 	adminUserID  int64
 	client       *tg.Client
+	authInput    *tg.AdminAuth
 	keywordStore *storage.KeywordStore
 	settings     *storage.SettingsStore
 	blacklist    *storage.BlacklistStore
@@ -66,10 +67,11 @@ type AdminService struct {
 	pending map[int64]pendingAction
 }
 
-func NewAdminService(adminUserID int64, client *tg.Client, keywordStore *storage.KeywordStore, settings *storage.SettingsStore, blacklist *storage.BlacklistStore, logger *logx.Logger) *AdminService {
+func NewAdminService(adminUserID int64, client *tg.Client, keywordStore *storage.KeywordStore, settings *storage.SettingsStore, blacklist *storage.BlacklistStore, authInput *tg.AdminAuth, logger *logx.Logger) *AdminService {
 	return &AdminService{
 		adminUserID:  adminUserID,
 		client:       client,
+		authInput:    authInput,
 		keywordStore: keywordStore,
 		settings:     settings,
 		blacklist:    blacklist,
@@ -100,6 +102,16 @@ func (s *AdminService) handleMessage(ctx context.Context, msg *model.Message) (b
 		return true, s.client.SendMessage(ctx, msg.Chat.ID, s.mainText(), s.mainKeyboard())
 	case "/chatid":
 		return true, s.client.SendMessage(ctx, msg.Chat.ID, fmt.Sprintf("当前聊天 ID: %d", msg.Chat.ID), nil)
+	}
+
+	if s.authInput != nil && !strings.HasPrefix(text, "/") {
+		if handled, kind := s.authInput.Submit(text); handled {
+			ack := "å·²æ”¶åˆ°ç™»å½•ä¿¡æ¯ï¼Œæ­£åœ¨ç»§ç»­ç™»å½•ã€‚"
+			if kind == "password" {
+				ack = "å·²æ”¶åˆ°ä¸¤æ­¥éªŒè¯å¯†ç ï¼Œæ­£åœ¨ç»§ç»­ç™»å½•ã€‚"
+			}
+			return true, s.client.SendMessage(ctx, msg.Chat.ID, ack, nil)
+		}
 	}
 
 	action := s.getPending(msg.From.ID)

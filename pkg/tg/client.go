@@ -33,6 +33,7 @@ type Client struct {
 	appHash     string
 	phone       string
 	sessionFile string
+	authFlow    auth.UserAuthenticator
 	logger      *logx.Logger
 	baseURL     string
 	httpClient  *http.Client
@@ -44,11 +45,19 @@ type Client struct {
 }
 
 func NewClient(appID int, appHash, phone, sessionFile string, logger *logx.Logger) *Client {
+	return NewClientWithAuth(appID, appHash, phone, sessionFile, terminalAuth{phone: phone}, logger)
+}
+
+func NewClientWithAuth(appID int, appHash, phone, sessionFile string, authFlow auth.UserAuthenticator, logger *logx.Logger) *Client {
+	if authFlow == nil {
+		authFlow = terminalAuth{phone: phone}
+	}
 	return &Client{
 		appID:       appID,
 		appHash:     appHash,
 		phone:       phone,
 		sessionFile: sessionFile,
+		authFlow:    authFlow,
 		logger:      logger,
 		peers:       make(map[int64]mtproto.InputPeerClass),
 	}
@@ -100,7 +109,7 @@ func (c *Client) Run(ctx context.Context, handler func(context.Context, model.Up
 		},
 	})
 
-	flow := auth.NewFlow(terminalAuth{phone: c.phone}, auth.SendCodeOptions{})
+	flow := auth.NewFlow(c.authFlow, auth.SendCodeOptions{})
 
 	return client.Run(ctx, func(ctx context.Context) error {
 		if err := client.Auth().IfNecessary(ctx, flow); err != nil {

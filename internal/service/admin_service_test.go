@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/marinlarabel717-stack/jtbot/internal/logx"
 	"github.com/marinlarabel717-stack/jtbot/internal/model"
@@ -149,6 +150,67 @@ func TestAdminPendingUnblockUser(t *testing.T) {
 	}
 }
 
+func TestAdminMessageSubmitsPendingLoginCode(t *testing.T) {
+	t.Parallel()
+
+	client, calls := newAdminTestClient(t)
+	authInput := tg.NewAdminAuth("+123456", 123, client, logx.New("debug"))
+	admin, _, _ := newAdminTestServiceWithAuth(t, client, authInput)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	codeCh := make(chan string, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		code, err := authInput.Code(ctx, nil)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		codeCh <- code
+	}()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for calls.send == 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if calls.send == 0 {
+		t.Fatal("expected login prompt to be sent before admin reply")
+	}
+
+	handled, err := admin.HandleUpdate(context.Background(), model.Update{
+		UpdateID: 3,
+		Message: &model.Message{
+			MessageID: 7,
+			From:      &model.User{ID: 123},
+			Chat:      model.Chat{ID: 999},
+			Text:      "54321",
+		},
+	})
+	if err != nil {
+		t.Fatalf("handle update: %v", err)
+	}
+	if !handled {
+		t.Fatalf("expected admin login input to be handled")
+	}
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("auth prompt returned error: %v", err)
+	case code := <-codeCh:
+		if code != "54321" {
+			t.Fatalf("expected code 54321, got %q", code)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for auth code")
+	}
+
+	if calls.send < 2 {
+		t.Fatalf("expected prompt and ack sendMessage calls, got %d", calls.send)
+	}
+}
+
 type adminTestCalls struct {
 	send   int
 	edit   int
@@ -180,6 +242,10 @@ func newAdminTestClient(t *testing.T) (*tg.Client, *adminTestCalls) {
 }
 
 func newAdminTestService(t *testing.T, client *tg.Client) (*AdminService, *storage.SettingsStore, *storage.BlacklistStore) {
+	return newAdminTestServiceWithAuth(t, client, nil)
+}
+
+func newAdminTestServiceWithAuth(t *testing.T, client *tg.Client, authInput *tg.AdminAuth) (*AdminService, *storage.SettingsStore, *storage.BlacklistStore) {
 	t.Helper()
 
 	tmpDir := t.TempDir()
@@ -208,6 +274,6 @@ func newAdminTestService(t *testing.T, client *tg.Client) (*AdminService, *stora
 		t.Fatalf("new blacklist: %v", err)
 	}
 
-	admin := NewAdminService(123, client, keywordStore, settingsStore, blacklistStore, logx.New("debug"))
+	admin := NewAdminService(123, client, keywordStore, settingsStore, blacklistStore, authInput, logx.New("debug"))
 	return admin, settingsStore, blacklistStore
 }

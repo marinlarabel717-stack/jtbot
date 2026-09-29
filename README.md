@@ -18,7 +18,7 @@ The current version provides:
 
 Current limitation:
 
-- first login requires interactive code entry in the terminal
+- first login needs a Telegram code; if `BOT_TOKEN` + `ADMIN_USER_ID` are configured, you can now complete it from the admin backend, otherwise it falls back to terminal input
 - monitored channels/groups must already be joined by the account session
 
 ## Project Structure
@@ -47,7 +47,9 @@ pkg/tg
 4. Optionally fill in `MONITOR_CHAT_IDS` and `ALERT_CHAT_ID`
 5. Adjust `configs/keywords.example.json`
 6. Run `go run ./cmd/jtbot`
-7. Enter the Telegram login code the first time the session is created
+7. Complete the first Telegram login:
+   - if admin backend is enabled, wait for the bot to prompt you in the admin chat and reply there with the login code
+   - otherwise enter the login code in the terminal
 8. Keep the account in the groups you want to monitor
 9. If Bot API admin is enabled, open that bot and send `/start`
 

@@ -79,16 +79,21 @@ func New() (*App, error) {
 		return nil, err
 	}
 
-	monitorClient := tg.NewClient(cfg.AppID, cfg.AppHash, cfg.Phone, cfg.SessionFile, logger)
 	var adminClient *tg.Client
 	var adminPoller *listener.Poller
+	var adminAuth *tg.AdminAuth
 	if cfg.BotToken != "" && cfg.AdminUserID != 0 {
 		adminClient = tg.NewBotAPIClient(cfg.BotToken)
-		adminSvc := service.NewAdminService(cfg.AdminUserID, adminClient, keywordStore, settingsStore, blacklistStore, logger)
+		adminAuth = tg.NewAdminAuth(cfg.Phone, cfg.AdminUserID, adminClient, logger)
+		adminSvc := service.NewAdminService(cfg.AdminUserID, adminClient, keywordStore, settingsStore, blacklistStore, adminAuth, logger)
 		adminPoller = listener.NewPoller(adminClient, cfg.PollTimeout, logger, func(ctx context.Context, update model.Update) error {
 			_, err := adminSvc.HandleUpdate(ctx, update)
 			return err
 		})
+	}
+	monitorClient := tg.NewClient(cfg.AppID, cfg.AppHash, cfg.Phone, cfg.SessionFile, logger)
+	if adminAuth != nil {
+		monitorClient = tg.NewClientWithAuth(cfg.AppID, cfg.AppHash, cfg.Phone, cfg.SessionFile, adminAuth, logger)
 	}
 
 	jobQueue := queue.NewMessageQueue(cfg.QueueSize)
