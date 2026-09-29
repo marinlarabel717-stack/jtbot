@@ -433,7 +433,7 @@ type terminalAuth struct {
 	phone string
 }
 
-func (t terminalAuth) Phone(context.Context) (string, error) {
+func (t terminalAuth) Phone(_ context.Context) (string, error) {
 	return t.phone, nil
 }
 
@@ -444,15 +444,15 @@ func (t terminalAuth) Password(ctx context.Context) (string, error) {
 	return promptTerminal("password (leave blank if not enabled): ")
 }
 
-func (t terminalAuth) AcceptTermsOfService(context.Context, mtproto.HelpTermsOfService) error {
+func (t terminalAuth) AcceptTermsOfService(_ context.Context, _ mtproto.HelpTermsOfService) error {
 	return errors.New("sign up flow is not supported in terminal auth")
 }
 
-func (t terminalAuth) SignUp(context.Context) (auth.UserInfo, error) {
+func (t terminalAuth) SignUp(_ context.Context) (auth.UserInfo, error) {
 	return auth.UserInfo{}, errors.New("sign up flow is not supported in terminal auth")
 }
 
-func (t terminalAuth) Code(context.Context, *mtproto.AuthSentCode) (string, error) {
+func (t terminalAuth) Code(_ context.Context, _ *mtproto.AuthSentCode) (string, error) {
 	return promptTerminal("code: ")
 }
 

@@ -45,7 +45,7 @@ func NewAdminAuth(phone string, adminUserID int64, client *Client, logger *logx.
 	}
 }
 
-func (a *AdminAuth) Phone(context.Context) (string, error) {
+func (a *AdminAuth) Phone(_ context.Context) (string, error) {
 	return a.phone, nil
 }
 
@@ -56,15 +56,15 @@ func (a *AdminAuth) Password(ctx context.Context) (string, error) {
 	return a.request(ctx, pendingAuthPassword, fmt.Sprintf("监控号 %s 需要两步验证密码，请直接在这里发送密码。", a.phone))
 }
 
-func (a *AdminAuth) AcceptTermsOfService(context.Context, mtproto.HelpTermsOfService) error {
+func (a *AdminAuth) AcceptTermsOfService(_ context.Context, _ mtproto.HelpTermsOfService) error {
 	return errors.New("sign up flow is not supported in admin auth")
 }
 
-func (a *AdminAuth) SignUp(context.Context) (auth.UserInfo, error) {
+func (a *AdminAuth) SignUp(_ context.Context) (auth.UserInfo, error) {
 	return auth.UserInfo{}, errors.New("sign up flow is not supported in admin auth")
 }
 
-func (a *AdminAuth) Code(ctx context.Context, *mtproto.AuthSentCode) (string, error) {
+func (a *AdminAuth) Code(ctx context.Context, _ *mtproto.AuthSentCode) (string, error) {
 	return a.request(ctx, pendingAuthCode, fmt.Sprintf("监控号 %s 需要登录验证码，请直接在这里发送本次验证码。", a.phone))
 }
 
