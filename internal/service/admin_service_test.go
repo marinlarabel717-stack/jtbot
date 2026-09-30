@@ -1,8 +1,11 @@
 package service
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -354,4 +357,56 @@ func (adminTestDMManager) RestartDMAccount(context.Context, string) error {
 
 func (adminTestDMManager) DeleteDMAccount(context.Context, string) error {
 	return nil
+}
+
+func TestBuildDMAccountSessionsZipPrefersOriginalSessionFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	originalPath := filepath.Join(tmpDir, "real.session")
+	convertedPath := filepath.Join(tmpDir, "converted.json")
+	if err := os.WriteFile(originalPath, []byte("original-session"), 0o600); err != nil {
+		t.Fatalf("write original session: %v", err)
+	}
+	if err := os.WriteFile(convertedPath, []byte("converted-session"), 0o600); err != nil {
+		t.Fatalf("write converted session: %v", err)
+	}
+
+	data, count, err := buildDMAccountSessionsZip([]DMAccountInfo{
+		{
+			Phone:               "+10001",
+			SessionFile:         convertedPath,
+			OriginalSessionFile: originalPath,
+			OriginalSessionName: "keep_me.session",
+		},
+	})
+	if err != nil {
+		t.Fatalf("build zip: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected 1 session file, got %d", count)
+	}
+
+	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		t.Fatalf("open zip: %v", err)
+	}
+	if len(reader.File) != 1 {
+		t.Fatalf("expected 1 zip entry, got %d", len(reader.File))
+	}
+	if reader.File[0].Name != "keep_me.session" {
+		t.Fatalf("expected original filename, got %q", reader.File[0].Name)
+	}
+	file, err := reader.File[0].Open()
+	if err != nil {
+		t.Fatalf("open zip entry: %v", err)
+	}
+	defer file.Close()
+	content, err := io.ReadAll(file)
+	if err != nil {
+		t.Fatalf("read zip entry: %v", err)
+	}
+	if string(content) != "original-session" {
+		t.Fatalf("expected original session content, got %q", string(content))
+	}
 }

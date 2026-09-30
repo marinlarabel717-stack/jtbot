@@ -11,8 +11,10 @@ import (
 )
 
 type DMAccount struct {
-	Phone       string `json:"phone"`
-	SessionFile string `json:"session_file"`
+	Phone               string `json:"phone"`
+	SessionFile         string `json:"session_file"`
+	OriginalSessionFile string `json:"original_session_file,omitempty"`
+	OriginalSessionName string `json:"original_session_name,omitempty"`
 }
 
 type DMAccountStore struct {
@@ -77,8 +79,9 @@ func (s *DMAccountStore) Add(phone string) (DMAccount, bool, error) {
 	}
 
 	account := DMAccount{
-		Phone:       normalized,
-		SessionFile: filepath.Join(s.sessionsDir, sanitizeDMPhone(normalized)+".json"),
+		Phone:               normalized,
+		SessionFile:         filepath.Join(s.sessionsDir, sanitizeDMPhone(normalized)+".json"),
+		OriginalSessionFile: filepath.Join(s.sessionsDir, sanitizeDMPhone(normalized)+".session"),
 	}
 	s.accounts = append(s.accounts, account)
 	sort.Slice(s.accounts, func(i, j int) bool {
@@ -88,6 +91,33 @@ func (s *DMAccountStore) Add(phone string) (DMAccount, bool, error) {
 		return DMAccount{}, false, err
 	}
 	return account, true, nil
+}
+
+func (s *DMAccountStore) SaveOriginalSessionMeta(phone, filename string) (DMAccount, error) {
+	normalized := normalizePhone(phone)
+	filename = strings.TrimSpace(filepath.Base(filename))
+	if normalized == "" {
+		return DMAccount{}, nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i := range s.accounts {
+		if s.accounts[i].Phone != normalized {
+			continue
+		}
+		if strings.TrimSpace(s.accounts[i].OriginalSessionFile) == "" {
+			s.accounts[i].OriginalSessionFile = filepath.Join(s.sessionsDir, sanitizeDMPhone(normalized)+".session")
+		}
+		s.accounts[i].OriginalSessionName = filename
+		if err := s.persistLocked(); err != nil {
+			return DMAccount{}, err
+		}
+		return s.accounts[i], nil
+	}
+
+	return DMAccount{}, nil
 }
 
 func (s *DMAccountStore) Remove(phone string) (DMAccount, bool, error) {
@@ -132,6 +162,9 @@ func (s *DMAccountStore) load() error {
 		s.accounts[i].Phone = normalizePhone(s.accounts[i].Phone)
 		if strings.TrimSpace(s.accounts[i].SessionFile) == "" {
 			s.accounts[i].SessionFile = filepath.Join(s.sessionsDir, sanitizeDMPhone(s.accounts[i].Phone)+".json")
+		}
+		if strings.TrimSpace(s.accounts[i].OriginalSessionFile) == "" {
+			s.accounts[i].OriginalSessionFile = filepath.Join(s.sessionsDir, sanitizeDMPhone(s.accounts[i].Phone)+".session")
 		}
 	}
 	sort.Slice(s.accounts, func(i, j int) bool {

@@ -423,8 +423,10 @@ func (a *App) ListDMAccounts() []service.DMAccountInfo {
 
 	for _, account := range accounts {
 		info := service.DMAccountInfo{
-			Phone:       account.Phone,
-			SessionFile: account.SessionFile,
+			Phone:               account.Phone,
+			SessionFile:         account.SessionFile,
+			OriginalSessionFile: account.OriginalSessionFile,
+			OriginalSessionName: account.OriginalSessionName,
 		}
 		if runtime, ok := a.dmAccounts[account.Phone]; ok && runtime != nil {
 			info.Online = runtime.online
@@ -555,6 +557,16 @@ func (a *App) importSingleDMSession(ctx, runCtx context.Context, file tg.Importe
 		return "", errors.New("导入后的私信号标识为空")
 	}
 
+	if strings.TrimSpace(account.OriginalSessionFile) != "" {
+		if err := os.WriteFile(account.OriginalSessionFile, file.Data, 0o600); err != nil {
+			return "", fmt.Errorf("save original session: %w", err)
+		}
+	}
+	account, err = a.dmStore.SaveOriginalSessionMeta(account.Phone, file.Name)
+	if err != nil {
+		return "", fmt.Errorf("save original session meta: %w", err)
+	}
+
 	if err := tg.ConvertTelethonSQLiteSessionFile(ctx, sqlitePath, account.SessionFile); err != nil {
 		return "", err
 	}
@@ -623,6 +635,11 @@ func (a *App) DeleteDMAccount(ctx context.Context, phone string) error {
 
 	if strings.TrimSpace(account.SessionFile) != "" {
 		if err := os.Remove(account.SessionFile); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	if strings.TrimSpace(account.OriginalSessionFile) != "" {
+		if err := os.Remove(account.OriginalSessionFile); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 	}

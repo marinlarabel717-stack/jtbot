@@ -143,17 +143,19 @@ type MonitorAccountInfo struct {
 }
 
 type DMAccountInfo struct {
-	Phone           string
-	SessionFile     string
-	Online          bool
-	LastError       string
-	TodaySent       int
-	TodaySuccess    int
-	TodayFailed     int
-	StatusCode      string
-	StatusSummary   string
-	StatusCheckedAt time.Time
-	CanSendDM       bool
+	Phone               string
+	SessionFile         string
+	OriginalSessionFile string
+	OriginalSessionName string
+	Online              bool
+	LastError           string
+	TodaySent           int
+	TodaySuccess        int
+	TodayFailed         int
+	StatusCode          string
+	StatusSummary       string
+	StatusCheckedAt     time.Time
+	CanSendDM           bool
 }
 
 type DMAccountCheckResult struct {
@@ -2194,7 +2196,7 @@ func buildDMAccountSessionsZip(accounts []DMAccountInfo) ([]byte, int, error) {
 	count := 0
 
 	for _, account := range accounts {
-		path := strings.TrimSpace(account.SessionFile)
+		path, name := dmAccountExportSessionFile(account)
 		if path == "" {
 			continue
 		}
@@ -2203,7 +2205,9 @@ func buildDMAccountSessionsZip(accounts []DMAccountInfo) ([]byte, int, error) {
 			continue
 		}
 
-		name := filepathBase(path)
+		if name == "" {
+			name = filepathBase(path)
+		}
 		entry, err := writer.Create(name)
 		if err != nil {
 			_ = writer.Close()
@@ -2247,6 +2251,17 @@ func buildDMAccountReport(accounts []DMAccountInfo, label string) []byte {
 	}
 
 	return []byte(strings.Join(lines, "\n"))
+}
+
+func dmAccountExportSessionFile(account DMAccountInfo) (string, string) {
+	originalPath := strings.TrimSpace(account.OriginalSessionFile)
+	if originalPath != "" {
+		if _, err := os.Stat(originalPath); err == nil {
+			return originalPath, strings.TrimSpace(account.OriginalSessionName)
+		}
+	}
+
+	return strings.TrimSpace(account.SessionFile), filepathBase(account.SessionFile)
 }
 
 func newDMStatusCounts() map[string]int {
