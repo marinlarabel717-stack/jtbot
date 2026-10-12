@@ -15,7 +15,6 @@ env/
 
 # Runtime data
 jtbot.log
-jtbot.exe
 sessions/
 dm_sessions/
 exports/
