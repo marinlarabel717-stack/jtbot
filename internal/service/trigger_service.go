@@ -163,6 +163,11 @@ func (s *TriggerService) HandleUpdate(ctx context.Context, update model.Update) 
 		return nil
 	}
 
+	if !s.settings.IsAutoDMEnabled() {
+		s.logger.Infof("skip auto dm: user=%d reason=auto_dm_disabled", msg.From.ID)
+		return nil
+	}
+
 	return s.queue.Publish(ctx, job)
 }
 

@@ -55,6 +55,7 @@ func TestPipelineQueuesAndSendsDM(t *testing.T) {
 
 	settingsStore, err := storage.NewSettingsStore(filepath.Join(tmpDir, "settings.json"), storage.RuntimeSettings{
 		MonitoringEnabled: true,
+		AutoDMEnabled:     true,
 		MonitorChatIDs:    []int64{-100123},
 		CooldownMinutes:   60,
 		DMTemplate:        "你好，看到你提到 {keywords}",

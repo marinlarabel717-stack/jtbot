@@ -225,6 +225,8 @@ func TestTriggerServiceFormatsAlertText(t *testing.T) {
 func newTriggerTestService(t *testing.T, defaults storage.RuntimeSettings) (*TriggerService, *storage.RecordStore, *storage.BlacklistStore) {
 	t.Helper()
 
+	defaults.AutoDMEnabled = true
+
 	tmpDir := t.TempDir()
 	recordStore, err := storage.NewRecordStore(filepath.Join(tmpDir, "records.json"))
 	if err != nil {

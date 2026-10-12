@@ -129,6 +129,19 @@ func (s *KeywordStore) Remove(raw []string) (int, error) {
 	return removed, s.persistLocked()
 }
 
+func (s *KeywordStore) Clear() (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	removed := len(s.data.Entries)
+	if removed == 0 {
+		return 0, nil
+	}
+	s.data.Entries = nil
+	s.data.Keywords = nil
+	return removed, s.persistLocked()
+}
+
 func (s *KeywordStore) persistLocked() error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return err

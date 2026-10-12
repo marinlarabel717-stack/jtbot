@@ -30,6 +30,7 @@ const (
 	callbackKeywords            = "admin:keywords"
 	callbackKeywordAdd          = "admin:keyword:add"
 	callbackKeywordRemove       = "admin:keyword:remove"
+	callbackKeywordClearAll     = "admin:keyword:clear_all"
 	callbackDMPool              = "admin:dm_pool"
 	callbackDMConnect           = "admin:dm:connect"
 	callbackDMUpload            = "admin:dm:upload"
@@ -61,6 +62,7 @@ const (
 	callbackExportFormatCSV     = "admin:export:format:csv"
 	callbackFilters             = "admin:filters"
 	callbackToggleMonitor       = "admin:rule:toggle_monitor"
+	callbackToggleAutoDM        = "admin:rule:toggle_auto_dm"
 	callbackToggleDryRun        = "admin:rule:toggle_dryrun"
 	callbackSetCooldown         = "admin:rule:set_cooldown"
 	callbackSetChatCooldown     = "admin:rule:set_chat_cooldown"
@@ -336,6 +338,13 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 		s.setPending(callback.From.ID, pendingRemoveKeyword)
 		text, keyboard = "发送要删除的关键词，多个用 | 或换行分隔。\n\n支持：\n精准:关键词\n模糊:关键词\n或直接发关键词文本（会删除同名的精准/模糊规则）。", s.keywordsKeyboard()
 		alert = "等待你发送要删除的关键词"
+	case callbackKeywordClearAll:
+		var removed int
+		removed, err = s.keywordStore.Clear()
+		text, keyboard = s.keywordsText(), s.keywordsKeyboard()
+		if err == nil {
+			alert = fmt.Sprintf("已清空 %d 个关键词", removed)
+		}
 	case callbackDMPool:
 		text, keyboard = s.dmPoolText(), s.dmPoolKeyboard()
 	case callbackDMConnect:
@@ -393,7 +402,7 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 			text, keyboard = s.dmRecordsText(), s.dmRecordsKeyboard()
 		}
 	case callbackDMSettings:
-		text, keyboard = s.dmSettingsText(), s.dmSettingsKeyboard()
+		text, keyboard = s.dmSettingsSummaryText(), s.dmSettingsKeyboard()
 	case callbackExport:
 		text, keyboard = s.exportText(), s.exportKeyboard()
 	case callbackExportByTime:
@@ -422,6 +431,17 @@ func (s *AdminService) handleCallback(ctx context.Context, callback *model.Callb
 				alert = "监控已开启"
 			} else {
 				alert = "监控已关闭"
+			}
+		}
+	case callbackToggleAutoDM:
+		var enabled bool
+		enabled, err = s.settings.ToggleAutoDM()
+		text, keyboard = s.dmSettingsSummaryText(), s.dmSettingsKeyboard()
+		if err == nil {
+			if enabled {
+				alert = "自动私信已开启"
+			} else {
+				alert = "自动私信已关闭"
 			}
 		}
 	case callbackToggleDryRun:
@@ -1339,6 +1359,7 @@ func (s *AdminService) backToAccountsKeyboard() *model.InlineKeyboardMarkup {
 func (s *AdminService) keywordsKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{{Text: "一键清空关键词", CallbackData: callbackKeywordClearAll}},
 			{
 				{Text: "➕ 模糊关键词", CallbackData: callbackKeywordAdd},
 				{Text: "🎯 精准关键词", CallbackData: callbackKeywordAdd + ":exact"},
@@ -1452,6 +1473,9 @@ func (s *AdminService) dmRecordsKeyboard() *model.InlineKeyboardMarkup {
 func (s *AdminService) dmSettingsKeyboard() *model.InlineKeyboardMarkup {
 	return &model.InlineKeyboardMarkup{
 		InlineKeyboard: [][]model.InlineKeyboardButton{
+			{
+				{Text: "开关自动私信", CallbackData: callbackToggleAutoDM},
+			},
 			{
 				{Text: "切换 Dry-run", CallbackData: callbackToggleDryRun},
 				{Text: "设置冷却", CallbackData: callbackSetCooldown},
@@ -2408,4 +2432,15 @@ func (s *AdminService) clearExportContext(userID int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.exportCtx, userID)
+}
+
+func (s *AdminService) dmSettingsSummaryText() string {
+	state := s.settings.Snapshot()
+	return fmt.Sprintf(
+		"私信发送设置\n\n自动私信: %s\n冷却时间: %d 分钟\n发送模式: %s\n当前默认模板:\n%s",
+		onOff(state.AutoDMEnabled),
+		state.CooldownMinutes,
+		dryRunLabel(state.DryRun),
+		state.DMTemplate,
+	)
 }

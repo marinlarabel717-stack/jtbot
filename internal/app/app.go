@@ -121,6 +121,7 @@ func New() (*App, error) {
 
 	settingsStore, err := storage.NewSettingsStore(cfg.SettingsFile, storage.RuntimeSettings{
 		MonitoringEnabled:   true,
+		AutoDMEnabled:       true,
 		MonitorChatIDs:      mapKeys(cfg.MonitorChatIDs),
 		AlertChatID:         cfg.AlertChatID,
 		CooldownMinutes:     int(cfg.Cooldown / time.Minute),

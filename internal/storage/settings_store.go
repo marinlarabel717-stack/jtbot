@@ -19,6 +19,7 @@ type SettingsStore struct {
 
 type RuntimeSettings struct {
 	MonitoringEnabled   bool     `json:"monitoring_enabled"`
+	AutoDMEnabled       bool     `json:"auto_dm_enabled"`
 	MonitorChatIDs      []int64  `json:"monitor_chat_ids"`
 	AlertChatID         int64    `json:"alert_chat_id"`
 	CooldownMinutes     int      `json:"cooldown_minutes"`
@@ -64,6 +65,9 @@ func (s *SettingsStore) load() error {
 
 	if value, ok := raw["monitoring_enabled"]; ok {
 		_ = json.Unmarshal(value, &s.state.MonitoringEnabled)
+	}
+	if value, ok := raw["auto_dm_enabled"]; ok {
+		_ = json.Unmarshal(value, &s.state.AutoDMEnabled)
 	}
 	if value, ok := raw["monitor_chat_ids"]; ok {
 		var ids []int64
@@ -152,11 +156,24 @@ func (s *SettingsStore) IsMonitoringEnabled() bool {
 	return s.state.MonitoringEnabled
 }
 
+func (s *SettingsStore) IsAutoDMEnabled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.state.AutoDMEnabled
+}
+
 func (s *SettingsStore) ToggleMonitoring() (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.state.MonitoringEnabled = !s.state.MonitoringEnabled
 	return s.state.MonitoringEnabled, s.persistLocked()
+}
+
+func (s *SettingsStore) ToggleAutoDM() (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.state.AutoDMEnabled = !s.state.AutoDMEnabled
+	return s.state.AutoDMEnabled, s.persistLocked()
 }
 
 func (s *SettingsStore) MonitorChatIDSet() map[int64]struct{} {
